@@ -118,4 +118,12 @@ export const appointmentService = {
 
     return response.data;
   },
+
+  async startConsultation(id: string): Promise<Appointment> {
+    const response = await apiClient.post<Appointment>(
+      `/appointments/${id}/start`,
+    );
+
+    return response.data;
+  },
 };

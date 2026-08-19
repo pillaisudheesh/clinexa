@@ -63,18 +63,29 @@ function statusLabel(status: string) {
 
 function statusClass(status: string) {
   switch (status) {
+    case "SCHEDULED":
+      return "bg-slate-50 text-slate-600 ring-1 ring-inset ring-slate-200";
+
     case "CONFIRMED":
-      return "bg-emerald-50 text-emerald-700";
+      return "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-100";
+
     case "CHECKED_IN":
-      return "bg-cyan-50 text-cyan-700";
-    case "IN_PROGRESS":
-      return "bg-violet-50 text-violet-700";
+      return "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-100";
+
+    case "IN_CONSULTATION":
+      return "bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-100";
+
     case "COMPLETED":
-      return "bg-slate-100 text-slate-600";
+      return "bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-100";
+
+    case "CANCELLED":
+      return "bg-red-50 text-red-600 ring-1 ring-inset ring-red-100";
+
     case "NO_SHOW":
-      return "bg-amber-50 text-amber-700";
+      return "bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-100";
+
     default:
-      return "bg-teal-50 text-teal-700";
+      return "bg-slate-50 text-slate-600 ring-1 ring-inset ring-slate-200";
   }
 }
 
@@ -215,6 +226,19 @@ function DashboardHeader({
   firstName: string;
   onRefresh: () => void;
 }) {
+  function getGreeting(): string {
+    const hour = new Date().getHours();
+
+    if (hour < 12) {
+      return "Good Morning";
+    }
+
+    if (hour < 17) {
+      return "Good Afternoon";
+    }
+
+    return "Good Evening";
+  }
   return (
     <div
       className="
@@ -252,7 +276,7 @@ function DashboardHeader({
             sm:text-3xl
           "
         >
-          Good morning, {firstName}
+          {getGreeting()}, {firstName}
         </h2>
 
         <p className="mt-1 text-sm text-slate-500">

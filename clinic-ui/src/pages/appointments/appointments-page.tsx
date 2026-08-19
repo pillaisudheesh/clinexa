@@ -16,6 +16,14 @@ import { useCallback, useEffect, useState } from "react";
 import { appointmentService } from "@/services/appointment-service";
 import { doctorService } from "@/services/doctor-service";
 import { patientService } from "@/services/patient-service";
+import { medicalRecordService } from "@/services/medical-record-service";
+import { useAuth } from "@/auth/auth-context";
+
+import type {
+  CreateMedicalRecordRequest,
+  MedicalRecord,
+  UpdateMedicalRecordRequest,
+} from "@/types/medical-record";
 
 import type {
   Appointment,
@@ -25,8 +33,17 @@ import type {
 
 import type { Doctor } from "@/types/doctor";
 import type { Patient } from "@/types/patient";
+import { diagnosisService } from "@/services/diagnosis-service";
+
+import type {
+  CreateDiagnosisRequest,
+  Diagnosis,
+  UpdateDiagnosisRequest,
+} from "@/types/diagnosis";
 
 import { AppointmentRegistrationModal } from "./appointment-registration-modal";
+import { AppointmentDetailsModal } from "./appointment-details-modal";
+import { ConsultationModal } from "./consultation-modal";
 
 const PAGE_SIZE = 10;
 
@@ -47,7 +64,7 @@ const STATUS_OPTIONS: {
     label: "Checked in",
   },
   {
-    value: "IN_PROGRESS",
+    value: "IN_CONSULTATION",
     label: "In consultation",
   },
   {
@@ -142,7 +159,7 @@ function getStatusClasses(status: AppointmentStatus) {
     case "CHECKED_IN":
       return "bg-amber-50 text-amber-700 ring-amber-100";
 
-    case "IN_PROGRESS":
+    case "IN_CONSULTATION":
       return "bg-violet-50 text-violet-700 ring-violet-100";
 
     case "COMPLETED":
@@ -175,9 +192,11 @@ function getPriorityClasses(priority: Appointment["priority"]) {
 function AppointmentRow({
   appointment,
   index,
+  onView,
 }: {
   appointment: Appointment;
   index: number;
+  onView: (id: string) => void;
 }) {
   return (
     <div
@@ -326,6 +345,7 @@ function AppointmentRow({
         <div className="flex justify-end">
           <button
             type="button"
+            onClick={() => onView(appointment.id)}
             className="
               inline-flex
               size-8
@@ -339,6 +359,7 @@ function AppointmentRow({
               hover:text-teal-600
             "
             title="View appointment"
+            aria-label="View appointment"
           >
             <Eye size={16} />
           </button>
@@ -351,9 +372,11 @@ function AppointmentRow({
 function AppointmentMobileCard({
   appointment,
   index,
+  onView,
 }: {
   appointment: Appointment;
   index: number;
+  onView: (id: string) => void;
 }) {
   return (
     <div
@@ -487,22 +510,37 @@ function AppointmentMobileCard({
           </div>
         </div>
 
-        <Eye
-          size={16}
+        <button
+          type="button"
+          onClick={() => onView(appointment.id)}
           className="
             mt-1
+            flex
+            size-8
             shrink-0
+            items-center
+            justify-center
+            rounded-lg
             text-slate-300
-            transition-colors
-            group-hover:text-teal-500
+            transition-all
+            duration-150
+            hover:bg-teal-50
+            hover:text-teal-600
           "
-        />
+          title="View appointment"
+          aria-label="View appointment"
+        >
+          <Eye size={16} />
+        </button>
       </div>
     </div>
   );
 }
 
 export function AppointmentsPage() {
+  const { user, hasPermission } = useAuth();
+
+  console.log("User permissions:", user?.permissions);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
 
   const [loading, setLoading] = useState(true);
@@ -530,6 +568,97 @@ export function AppointmentsPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
 
   const [doctors, setDoctors] = useState<Doctor[]>([]);
+
+  const [selectedAppointmentId, setSelectedAppointmentId] = useState<
+    string | null
+  >(null);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+
+  const [cancellationReason, setCancellationReason] = useState("");
+
+  const [cancelLoading, setCancelLoading] = useState(false);
+
+  const [selectedAppointment, setSelectedAppointment] =
+    useState<Appointment | null>(null);
+
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [checkingIn, setCheckingIn] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [startingConsultation, setStartingConsultation] = useState(false);
+  const [consultationOpen, setConsultationOpen] = useState(false);
+
+  const [consultationLoading, setConsultationLoading] = useState(false);
+
+  const [medicalRecord, setMedicalRecord] = useState<MedicalRecord | null>(
+    null,
+  );
+
+  const [medicalRecordSaving, setMedicalRecordSaving] = useState(false);
+
+  const [completing, setCompleting] = useState(false);
+  const [diagnoses, setDiagnoses] = useState<Diagnosis[]>([]);
+
+  const [diagnosesLoading, setDiagnosesLoading] = useState(false);
+
+  const [diagnosisSaving, setDiagnosisSaving] = useState(false);
+
+  const [diagnosisDeleting, setDiagnosisDeleting] = useState<string | null>(
+    null,
+  );
+
+  const canReadAppointments = hasPermission("APPOINTMENT_READ");
+
+  const canCreateAppointments = hasPermission("APPOINTMENT_CREATE");
+
+  const canUpdateAppointments = hasPermission("APPOINTMENT_UPDATE");
+
+  const canCancelAppointments = hasPermission("APPOINTMENT_CANCEL");
+
+  const canCreateMedicalRecords = hasPermission("MEDICAL_RECORD_CREATE");
+
+  const canReadMedicalRecords = hasPermission("MEDICAL_RECORD_READ");
+
+  const canUpdateMedicalRecords = hasPermission("MEDICAL_RECORD_UPDATE");
+
+  const canReadDiagnoses = hasPermission("DIAGNOSIS_READ");
+
+  const canCreateDiagnoses = hasPermission("DIAGNOSIS_CREATE");
+
+  const canUpdateDiagnoses = hasPermission("DIAGNOSIS_UPDATE");
+
+  const canDeleteDiagnoses = hasPermission("DIAGNOSIS_DELETE");
+
+  const canConfirmAppointment =
+    selectedAppointment?.status === "SCHEDULED" && canUpdateAppointments;
+
+  const canCheckInAppointment =
+    selectedAppointment?.status === "CONFIRMED" && canUpdateAppointments;
+
+  const canStartConsultation =
+    selectedAppointment?.status === "CHECKED_IN" && canUpdateAppointments;
+
+  const canCancelAppointment =
+    ["SCHEDULED", "CONFIRMED", "CHECKED_IN"].includes(
+      selectedAppointment?.status ?? "",
+    ) && canCancelAppointments;
+
+  const canCompleteAppointment =
+    selectedAppointment?.status === "IN_CONSULTATION" &&
+    canUpdateAppointments &&
+    (canCreateMedicalRecords || canUpdateMedicalRecords);
+
+  const canViewCompletedConsultation =
+    selectedAppointment?.status === "COMPLETED" && canReadMedicalRecords;
+
+  console.log("Diagnosis debug:", {
+    medicalRecord,
+    canReadDiagnoses,
+    canCreateDiagnoses,
+    canUpdateDiagnoses,
+    canDeleteDiagnoses,
+    diagnoses,
+  });
 
   const loadPatients = useCallback(async () => {
     try {
@@ -629,6 +758,371 @@ export function AppointmentsPage() {
     }
 
     setPage((current) => Math.min(totalPages, current + 1));
+  };
+
+  const openAppointmentDetails = async (id: string) => {
+    try {
+      setSelectedAppointmentId(id);
+      setSelectedAppointment(null);
+      setDetailsLoading(true);
+
+      const appointment = await appointmentService.getAppointment(id);
+
+      setSelectedAppointment(appointment);
+    } catch (error) {
+      console.error("Unable to load appointment details.", error);
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
+  const closeAppointmentDetails = () => {
+    setSelectedAppointmentId(null);
+    setSelectedAppointment(null);
+    setDetailsLoading(false);
+  };
+
+  const handleConfirmAppointment = async () => {
+    if (!selectedAppointment) {
+      return;
+    }
+
+    try {
+      setConfirming(true);
+
+      const updatedAppointment = await appointmentService.confirmAppointment(
+        selectedAppointment.id,
+      );
+
+      setSelectedAppointment(updatedAppointment);
+
+      await loadAppointments();
+    } catch (error) {
+      console.error("Unable to confirm appointment.", error);
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  const handleCheckInAppointment = async () => {
+    if (!selectedAppointment) {
+      return;
+    }
+
+    try {
+      setCheckingIn(true);
+
+      const updatedAppointment = await appointmentService.checkInAppointment(
+        selectedAppointment.id,
+      );
+
+      setSelectedAppointment(updatedAppointment);
+
+      await loadAppointments();
+    } catch (error) {
+      console.error("Unable to check in patient.", error);
+    } finally {
+      setCheckingIn(false);
+    }
+  };
+
+  const handleCancelAppointment = async () => {
+    if (!selectedAppointment) {
+      return;
+    }
+
+    try {
+      setCancelling(true);
+
+      const updatedAppointment = await appointmentService.cancelAppointment(
+        selectedAppointment.id,
+        cancellationReason,
+      );
+
+      setSelectedAppointment(updatedAppointment);
+
+      setShowCancelDialog(false);
+      setCancellationReason("");
+
+      await loadAppointments();
+    } catch (error) {
+      console.error("Unable to cancel appointment.", error);
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const handleStartConsultation = async () => {
+    if (!selectedAppointment) {
+      return;
+    }
+
+    try {
+      setStartingConsultation(true);
+
+      const updated = await appointmentService.startConsultation(
+        selectedAppointment.id,
+      );
+
+      setSelectedAppointment(updated);
+
+      await loadAppointments();
+
+      setConsultationOpen(true);
+
+      setConsultationLoading(true);
+
+      const response = await medicalRecordService.getMedicalRecords(updated.id);
+
+      if (response.data?.[0]) {
+        const record = response.data[0];
+
+        setMedicalRecord(record);
+
+        await loadDiagnoses(record.id);
+      } else {
+        setMedicalRecord(null);
+        setDiagnoses([]);
+      }
+    } catch (error) {
+      console.error("Unable to start consultation.", error);
+    } finally {
+      setStartingConsultation(false);
+      setConsultationLoading(false);
+    }
+  };
+
+  const openConsultation = async () => {
+    if (!selectedAppointment) {
+      return;
+    }
+
+    try {
+      setConsultationOpen(true);
+      setConsultationLoading(true);
+
+      const response = await medicalRecordService.getMedicalRecords(
+        selectedAppointment.id,
+      );
+
+      setMedicalRecord(response.data?.[0] ?? null);
+    } catch (error) {
+      console.error("Unable to load medical record.", error);
+
+      setMedicalRecord(null);
+    } finally {
+      setConsultationLoading(false);
+    }
+  };
+
+  const handleSaveMedicalRecord = async (
+    data: CreateMedicalRecordRequest | UpdateMedicalRecordRequest,
+  ) => {
+    if (!selectedAppointment) {
+      return;
+    }
+
+    try {
+      setMedicalRecordSaving(true);
+
+      if (medicalRecord) {
+        const updated = await medicalRecordService.updateMedicalRecord(
+          medicalRecord.id,
+          data as UpdateMedicalRecordRequest,
+        );
+
+        setMedicalRecord(updated);
+
+        return;
+      }
+
+      const created = await medicalRecordService.createMedicalRecord(
+        data as CreateMedicalRecordRequest,
+      );
+
+      setMedicalRecord(created);
+    } catch (error) {
+      console.error("Unable to save medical record.", error);
+    } finally {
+      setMedicalRecordSaving(false);
+    }
+  };
+
+  const handleCompleteAppointment = async () => {
+    if (!selectedAppointment || !medicalRecord) {
+      return;
+    }
+
+    try {
+      setCompleting(true);
+
+      const updated = await appointmentService.completeAppointment(
+        selectedAppointment.id,
+      );
+
+      setSelectedAppointment(updated);
+
+      setConsultationOpen(false);
+
+      await loadAppointments();
+    } catch (error) {
+      console.error("Unable to complete consultation.", error);
+    } finally {
+      setCompleting(false);
+    }
+  };
+  const handleCloseConsultation = () => {
+    if (medicalRecordSaving || completing) {
+      return;
+    }
+
+    setConsultationOpen(false);
+  };
+  const handleContinueConsultation = async () => {
+    if (!selectedAppointment) {
+      return;
+    }
+
+    setConsultationOpen(true);
+    setConsultationLoading(true);
+
+    try {
+      const response = await medicalRecordService.getMedicalRecords(
+        selectedAppointment.id,
+      );
+
+      if (response.data?.[0]) {
+        const record = response.data[0];
+
+        setMedicalRecord(record);
+
+        await loadDiagnoses(record.id);
+      } else {
+        setMedicalRecord(null);
+        setDiagnoses([]);
+      }
+    } catch (error) {
+      console.error("Unable to load consultation.", error);
+
+      setMedicalRecord(null);
+    } finally {
+      setConsultationLoading(false);
+    }
+  };
+
+  const handleViewConsultation = async () => {
+    if (!selectedAppointment) {
+      return;
+    }
+
+    try {
+      setConsultationOpen(true);
+      setConsultationLoading(true);
+
+      const response = await medicalRecordService.getMedicalRecords(
+        selectedAppointment.id,
+      );
+
+      if (response.data?.[0]) {
+        const record = response.data[0];
+
+        setMedicalRecord(record);
+
+        await loadDiagnoses(record.id);
+      } else {
+        setMedicalRecord(null);
+        setDiagnoses([]);
+      }
+    } catch (error) {
+      console.error("Unable to load completed consultation.", error);
+
+      setMedicalRecord(null);
+    } finally {
+      setConsultationLoading(false);
+    }
+  };
+
+  const loadDiagnoses = async (medicalRecordId: string) => {
+    if (!canReadDiagnoses) {
+      setDiagnoses([]);
+      return;
+    }
+
+    try {
+      setDiagnosesLoading(true);
+
+      const records =
+        await diagnosisService.getByMedicalRecord(medicalRecordId);
+
+      setDiagnoses(records);
+    } catch (error) {
+      console.error("Unable to load diagnoses.", error);
+
+      setDiagnoses([]);
+    } finally {
+      setDiagnosesLoading(false);
+    }
+  };
+
+  const handleCreateDiagnosis = async (data: CreateDiagnosisRequest) => {
+    if (!canCreateDiagnoses) {
+      return;
+    }
+
+    try {
+      setDiagnosisSaving(true);
+
+      const created = await diagnosisService.create(data);
+
+      setDiagnoses((current) => [created, ...current]);
+    } catch (error) {
+      console.error("Unable to create diagnosis.", error);
+    } finally {
+      setDiagnosisSaving(false);
+    }
+  };
+
+  const handleUpdateDiagnosis = async (
+    id: string,
+    data: UpdateDiagnosisRequest,
+  ) => {
+    if (!canUpdateDiagnoses) {
+      return;
+    }
+
+    try {
+      setDiagnosisSaving(true);
+
+      const updated = await diagnosisService.update(id, data);
+
+      setDiagnoses((current) =>
+        current.map((diagnosis) => (diagnosis.id === id ? updated : diagnosis)),
+      );
+    } catch (error) {
+      console.error("Unable to update diagnosis.", error);
+    } finally {
+      setDiagnosisSaving(false);
+    }
+  };
+
+  const handleDeleteDiagnosis = async (id: string) => {
+    if (!canDeleteDiagnoses) {
+      return;
+    }
+
+    try {
+      setDiagnosisDeleting(id);
+
+      await diagnosisService.remove(id);
+
+      setDiagnoses((current) =>
+        current.filter((diagnosis) => diagnosis.id !== id),
+      );
+    } catch (error) {
+      console.error("Unable to delete diagnosis.", error);
+    } finally {
+      setDiagnosisDeleting(null);
+    }
   };
 
   return (
@@ -1020,6 +1514,7 @@ export function AppointmentsPage() {
                       key={appointment.id}
                       appointment={appointment}
                       index={index}
+                      onView={openAppointmentDetails}
                     />
                   ))}
                 </div>
@@ -1033,6 +1528,7 @@ export function AppointmentsPage() {
                   key={appointment.id}
                   appointment={appointment}
                   index={index}
+                  onView={openAppointmentDetails}
                 />
               ))}
             </div>
@@ -1130,6 +1626,295 @@ export function AppointmentsPage() {
           await loadAppointments();
         }}
       />
+
+      {/* Appointment details modal */}
+      <AppointmentDetailsModal
+        open={Boolean(selectedAppointmentId)}
+        appointment={selectedAppointment}
+        loading={detailsLoading}
+        confirming={confirming}
+        checkingIn={checkingIn}
+        cancelling={cancelling}
+        startingConsultation={startingConsultation}
+        onClose={closeAppointmentDetails}
+        onConfirm={handleConfirmAppointment}
+        onCheckIn={handleCheckInAppointment}
+        onCancel={() => {
+          setCancellationReason("");
+          setShowCancelDialog(true);
+        }}
+        onStartConsultation={handleStartConsultation}
+        onContinueConsultation={handleContinueConsultation}
+        canViewCompletedConsultation={canViewCompletedConsultation}
+        onViewConsultation={handleViewConsultation}
+      />
+
+      <ConsultationModal
+        open={consultationOpen}
+        appointment={selectedAppointment}
+        medicalRecord={medicalRecord}
+        loading={consultationLoading}
+        saving={medicalRecordSaving}
+        completing={completing}
+        readOnly={selectedAppointment?.status === "COMPLETED"}
+        canCreateMedicalRecord={canCreateMedicalRecords}
+        canUpdateMedicalRecord={canUpdateMedicalRecords}
+        canCompleteAppointment={canCompleteAppointment}
+        diagnoses={diagnoses}
+        diagnosesLoading={diagnosesLoading}
+        diagnosisSaving={diagnosisSaving}
+        diagnosisDeleting={diagnosisDeleting}
+        canReadDiagnoses={canReadDiagnoses}
+        canCreateDiagnoses={canCreateDiagnoses}
+        canUpdateDiagnoses={canUpdateDiagnoses}
+        canDeleteDiagnoses={canDeleteDiagnoses}
+        onCreateDiagnosis={handleCreateDiagnosis}
+        onUpdateDiagnosis={handleUpdateDiagnosis}
+        onDeleteDiagnosis={handleDeleteDiagnosis}
+        onClose={handleCloseConsultation}
+        onSave={handleSaveMedicalRecord}
+        onComplete={handleCompleteAppointment}
+      />
+      {showCancelDialog && (
+        <div
+          className="
+      fixed
+      inset-0
+      z-[60]
+      flex
+      items-center
+      justify-center
+      bg-slate-950/30
+      p-4
+      backdrop-blur-[2px]
+    "
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              if (!cancelLoading) {
+                setShowCancelDialog(false);
+              }
+            }
+          }}
+        >
+          <div
+            className="
+        w-full
+        max-w-md
+        overflow-hidden
+        rounded-2xl
+        bg-white
+        shadow-[0_24px_70px_rgba(15,23,42,0.18)]
+        ring-1
+        ring-slate-200/70
+      "
+          >
+            {/* Header */}
+            <div className="relative px-6 pb-5 pt-6">
+              <div
+                className="
+            absolute
+            inset-x-0
+            bottom-0
+            h-px
+            bg-gradient-to-r
+            from-transparent
+            via-slate-200
+            to-transparent
+          "
+              />
+
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-base font-semibold text-slate-800">
+                    Cancel appointment
+                  </h3>
+
+                  <p className="mt-1 text-xs leading-5 text-slate-400">
+                    Are you sure you want to cancel this appointment?
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={cancelLoading}
+                  onClick={() => setShowCancelDialog(false)}
+                  className="
+              flex
+              size-8
+              items-center
+              justify-center
+              rounded-lg
+              text-slate-400
+              transition
+              hover:bg-slate-50
+              hover:text-slate-600
+              disabled:opacity-50
+            "
+                  aria-label="Close"
+                >
+                  <X size={17} />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="px-6 py-5">
+              {selectedAppointment && (
+                <div
+                  className="
+              rounded-xl
+              bg-slate-50/70
+              px-4
+              py-3
+              ring-1
+              ring-slate-100
+            "
+                >
+                  <p className="text-sm font-semibold text-slate-700">
+                    {formatPatientName(selectedAppointment)}
+                  </p>
+
+                  <p className="mt-0.5 text-xs text-slate-400">
+                    {selectedAppointment.appointmentNumber}
+                  </p>
+                </div>
+              )}
+
+              <div className="mt-4">
+                <label
+                  htmlFor="cancellation-reason"
+                  className="
+              mb-1.5
+              block
+              text-[11px]
+              font-medium
+              text-slate-500
+            "
+                >
+                  Cancellation reason
+                  <span className="ml-1 text-slate-300">(optional)</span>
+                </label>
+
+                <textarea
+                  id="cancellation-reason"
+                  value={cancellationReason}
+                  onChange={(event) =>
+                    setCancellationReason(event.target.value)
+                  }
+                  disabled={cancelLoading}
+                  rows={3}
+                  maxLength={500}
+                  placeholder="Enter a reason for cancellation..."
+                  className="
+              w-full
+              resize-none
+              rounded-xl
+              border-0
+              bg-slate-50
+              px-3
+              py-2.5
+              text-sm
+              leading-5
+              text-slate-700
+              outline-none
+              ring-1
+              ring-slate-200/70
+              placeholder:text-slate-300
+              focus:bg-white
+              focus:ring-2
+              focus:ring-teal-500/20
+              disabled:cursor-not-allowed
+              disabled:opacity-60
+            "
+                />
+
+                <div className="mt-1 flex justify-end">
+                  <span className="text-[10px] text-slate-300">
+                    {cancellationReason.length}/500
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="relative px-6 py-4">
+              <div
+                className="
+            absolute
+            inset-x-0
+            top-0
+            h-px
+            bg-gradient-to-r
+            from-transparent
+            via-slate-200
+            to-transparent
+          "
+              />
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={cancelLoading}
+                  onClick={() => setShowCancelDialog(false)}
+                  className="
+              rounded-xl
+              px-4
+              py-2.5
+              text-sm
+              font-medium
+              text-slate-500
+              transition
+              hover:bg-slate-50
+              hover:text-slate-700
+              disabled:opacity-50
+            "
+                >
+                  Keep appointment
+                </button>
+
+                <button
+                  type="button"
+                  disabled={cancelLoading}
+                  onClick={handleCancelAppointment}
+                  className="
+              inline-flex
+              items-center
+              justify-center
+              gap-2
+              rounded-xl
+              bg-red-600
+              px-4
+              py-2.5
+              text-sm
+              font-semibold
+              text-white
+              shadow-sm
+              transition
+              hover:bg-red-700
+              disabled:cursor-not-allowed
+              disabled:opacity-60
+            "
+                >
+                  {cancelLoading && (
+                    <span
+                      className="
+                  size-4
+                  animate-spin
+                  rounded-full
+                  border-2
+                  border-white/40
+                  border-t-white
+                "
+                    />
+                  )}
+
+                  {cancelLoading ? "Cancelling..." : "Cancel appointment"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -50,6 +50,13 @@ module.exports = {
     hot: true,
 
     open: true,
+    proxy: [
+      {
+        context: ["/api"],
+        target: "http://localhost:3000",
+        changeOrigin: true,
+      },
+    ],
 
     static: {
       directory: path.join(__dirname, "public"),
