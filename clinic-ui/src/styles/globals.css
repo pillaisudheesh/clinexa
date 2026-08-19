@@ -1,0 +1,164 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+
+  --color-clinexa-50: #f0fdfa;
+  --color-clinexa-100: #ccfbf1;
+  --color-clinexa-200: #99f6e4;
+  --color-clinexa-300: #5eead4;
+  --color-clinexa-400: #2dd4bf;
+  --color-clinexa-500: #14b8a6;
+  --color-clinexa-600: #0d9488;
+  --color-clinexa-700: #0f766e;
+  --color-clinexa-800: #115e59;
+  --color-clinexa-900: #134e4a;
+
+  --color-clinexa-blue-500: #3b82f6;
+  --color-clinexa-blue-600: #2563eb;
+  --color-clinexa-blue-700: #1d4ed8;
+
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+
+  --color-app-background: #f8fafc;
+  --color-surface: #ffffff;
+  --color-app-border: #e2e8f0;
+
+  --color-app-text: #0f172a;
+  --color-app-muted: #64748b;
+}
+
+:root {
+  /* ============================================================
+     Clinexa Brand
+  ============================================================ */
+
+  --clinexa-primary: #087f79;
+  --clinexa-primary-hover: #066e69;
+  --clinexa-primary-light: #13b8a8;
+
+  --clinexa-accent: #39d6c5;
+  --clinexa-accent-soft: #e8f8f6;
+
+  /* ============================================================
+     Application
+  ============================================================ */
+
+  --clinexa-background: #f6faf9;
+  --clinexa-surface: #ffffff;
+  --clinexa-surface-muted: #f8fafc;
+
+  --clinexa-text: #0f172a;
+  --clinexa-text-secondary: #334155;
+  --clinexa-text-muted: #64748b;
+
+  --clinexa-border: #e2e8f0;
+
+  /* ============================================================
+     Status
+  ============================================================ */
+
+  --clinexa-success: #16a34a;
+  --clinexa-success-soft: #f0fdf4;
+
+  --clinexa-warning: #d97706;
+  --clinexa-warning-soft: #fffbeb;
+
+  --clinexa-danger: #dc2626;
+  --clinexa-danger-soft: #fef2f2;
+
+  --clinexa-info: #0284c7;
+  --clinexa-info-soft: #f0f9ff;
+
+  /* ============================================================
+     Radius
+  ============================================================ */
+
+  --clinexa-radius-sm: 0.5rem;
+  --clinexa-radius-md: 0.75rem;
+  --clinexa-radius-lg: 1rem;
+  --clinexa-radius-xl: 1.25rem;
+
+  /* ============================================================
+     Shadows
+  ============================================================ */
+
+  --clinexa-shadow-card: 0 8px 30px -18px rgba(15, 118, 110, 0.22);
+
+  --clinexa-shadow-elevated: 0 20px 50px -25px rgba(15, 118, 110, 0.25);
+}
+
+.dark {
+  --background: #0f172a;
+  --foreground: #f8fafc;
+
+  --card: #1e293b;
+  --card-foreground: #f8fafc;
+
+  --popover: #1e293b;
+  --popover-foreground: #f8fafc;
+
+  --primary: #2dd4bf;
+  --primary-foreground: #042f2e;
+
+  --secondary: #334155;
+  --secondary-foreground: #f8fafc;
+
+  --muted: #334155;
+  --muted-foreground: #94a3b8;
+
+  --accent: #134e4a;
+  --accent-foreground: #ccfbf1;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+
+  --border: #334155;
+  --input: #334155;
+  --ring: #2dd4bf;
+}
+
+* {
+  border-color: var(--border);
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-feature-settings:
+    "rlig" 1,
+    "calt" 1;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+a {
+  -webkit-tap-highlight-color: transparent;
+}
