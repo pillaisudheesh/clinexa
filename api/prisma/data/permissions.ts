@@ -60,6 +60,25 @@ export const permissions: Record<string, PermissionSeed[]> = {
     { code: 'DIAGNOSIS_DELETE', name: 'Delete Diagnoses' },
   ],
 
+  PRESCRIPTION: [
+    {
+      code: 'PRESCRIPTION_READ',
+      name: 'View Prescriptions',
+    },
+    {
+      code: 'PRESCRIPTION_CREATE',
+      name: 'Create Prescriptions',
+    },
+    {
+      code: 'PRESCRIPTION_UPDATE',
+      name: 'Update Prescriptions',
+    },
+    {
+      code: 'PRESCRIPTION_DELETE',
+      name: 'Delete Prescriptions',
+    },
+  ],
+
   LABORATORY: [
     { code: 'LAB_READ', name: 'View Laboratory' },
     { code: 'LAB_CREATE', name: 'Create Laboratory Tests' },

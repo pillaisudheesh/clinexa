@@ -61,7 +61,7 @@ export class InventoryController {
   // ===========================================================================
 
   @Post('batches')
-  @Permissions(PermissionCodes.PHARMACY_CREATE)
+  @Permissions(PermissionCodes.INVENTORY_CREATE)
   @ApiOperation({
     summary: 'Create medicine batch',
   })
@@ -81,10 +81,7 @@ export class InventoryController {
   // ===========================================================================
 
   @Get('batches')
-  @Permissions(PermissionCodes.PHARMACY_READ)
-  @ApiOperation({
-    summary: 'Get medicine batches',
-  })
+  @Permissions(PermissionCodes.INVENTORY_READ)
   findAll(
     @Req() req: AuthenticatedRequest,
     @Query() query: MedicineBatchQueryDto,
@@ -97,7 +94,7 @@ export class InventoryController {
   // ===========================================================================
 
   @Get('low-stock')
-  @Permissions(PermissionCodes.PHARMACY_READ)
+  @Permissions(PermissionCodes.INVENTORY_READ)
   @ApiOperation({
     summary: 'Get low-stock medicine batches',
   })
@@ -112,7 +109,7 @@ export class InventoryController {
   // ===========================================================================
 
   @Get('batches/:id')
-  @Permissions(PermissionCodes.PHARMACY_READ)
+  @Permissions(PermissionCodes.INVENTORY_READ)
   @ApiOperation({
     summary: 'Get medicine batch',
   })
@@ -129,7 +126,7 @@ export class InventoryController {
   // ===========================================================================
 
   @Patch('batches/:id/stock')
-  @Permissions(PermissionCodes.PHARMACY_UPDATE)
+  @Permissions(PermissionCodes.INVENTORY_UPDATE)
   @ApiOperation({
     summary: 'Adjust medicine stock',
   })
@@ -147,7 +144,7 @@ export class InventoryController {
   // ===========================================================================
 
   @Get('summary')
-  @Permissions(PermissionCodes.PHARMACY_READ)
+  @Permissions(PermissionCodes.INVENTORY_READ)
   @ApiOperation({
     summary: 'Get inventory summary',
     description:
@@ -177,7 +174,7 @@ export class InventoryController {
   // ===========================================================================
 
   @Get('expiring')
-  @Permissions(PermissionCodes.PHARMACY_READ)
+  @Permissions(PermissionCodes.INVENTORY_READ)
   @ApiOperation({
     summary: 'Get expiring medicine batches',
     description:
@@ -208,7 +205,7 @@ export class InventoryController {
   // ===========================================================================
 
   @Get('expired')
-  @Permissions(PermissionCodes.PHARMACY_READ)
+  @Permissions(PermissionCodes.INVENTORY_READ)
   @ApiOperation({
     summary: 'Get expired medicine batches',
     description:
@@ -230,7 +227,7 @@ export class InventoryController {
   // ===========================================================================
 
   @Post('batches/:id/mark-expired')
-  @Permissions(PermissionCodes.PHARMACY_UPDATE)
+  @Permissions(PermissionCodes.INVENTORY_UPDATE)
   @ApiOperation({
     summary: 'Mark medicine batch as expired',
     description:
@@ -267,7 +264,7 @@ export class InventoryController {
   // ===========================================================================
 
   @Get('transactions')
-  @Permissions(PermissionCodes.PHARMACY_READ)
+  @Permissions(PermissionCodes.INVENTORY_READ)
   @ApiOperation({
     summary: 'Get inventory transactions',
     description:
@@ -298,7 +295,7 @@ export class InventoryController {
   // ===========================================================================
 
   @Get('batches/:id/transactions')
-  @Permissions(PermissionCodes.PHARMACY_READ)
+  @Permissions(PermissionCodes.INVENTORY_READ)
   @ApiOperation({
     summary: 'Get transactions for medicine batch',
     description:
@@ -339,7 +336,7 @@ export class InventoryController {
   // ===========================================================================
 
   @Post('receipts')
-  @Permissions(PermissionCodes.PHARMACY_UPDATE)
+  @Permissions(PermissionCodes.INVENTORY_UPDATE)
   @ApiOperation({
     summary: 'Create stock receipt',
     description:
@@ -378,7 +375,7 @@ export class InventoryController {
   // ===========================================================================
 
   @Get('receipts')
-  @Permissions(PermissionCodes.PHARMACY_READ)
+  @Permissions(PermissionCodes.INVENTORY_READ)
   @ApiOperation({
     summary: 'Get stock receipts',
     description: 'Returns paginated stock receiving history.',
@@ -407,7 +404,7 @@ export class InventoryController {
   // ===========================================================================
 
   @Get('receipts/:id')
-  @Permissions(PermissionCodes.PHARMACY_READ)
+  @Permissions(PermissionCodes.INVENTORY_READ)
   @ApiOperation({
     summary: 'Get stock receipt by ID',
   })

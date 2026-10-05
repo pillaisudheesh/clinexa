@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -9,7 +10,6 @@ import {
   Query,
   Req,
   UseGuards,
-  Delete,
 } from '@nestjs/common';
 
 import {
@@ -28,11 +28,14 @@ import { PermissionCodes } from '../auth/constants/permission-codes';
 
 import { InvoicesService } from './invoices.service';
 
-import { CreateInvoiceDto } from './dto/create-invoice.dto';
+import {
+  CreateInvoiceDto,
+  CreateInvoiceItemDto,
+} from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { InvoiceQueryDto } from './dto/invoice-query.dto';
 import { InvoiceResponseDto } from './dto/invoice-response.dto';
-import { CreateInvoiceItemDto } from './dto/create-invoice.dto';
+import { InvoiceSummaryResponseDto } from './dto/invoice-summary-response.dto';
 
 import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
 
@@ -66,22 +69,10 @@ export class InvoicesController {
     description: 'Invoice created successfully.',
     type: InvoiceResponseDto,
   })
-  @ApiResponse({
-    status: 400,
-    description: 'Invalid invoice data.',
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Authentication required.',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Insufficient permissions.',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Appointment not found.',
-  })
+  @ApiResponse({ status: 400, description: 'Invalid invoice data.' })
+  @ApiResponse({ status: 401, description: 'Authentication required.' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions.' })
+  @ApiResponse({ status: 404, description: 'Appointment not found.' })
   @ApiResponse({
     status: 409,
     description: 'Invoice already exists for the appointment.',
@@ -99,21 +90,13 @@ export class InvoicesController {
 
   @Get()
   @Permissions(PermissionCodes.BILLING_READ)
-  @ApiOperation({
-    summary: 'Get invoices',
-  })
+  @ApiOperation({ summary: 'Get invoices' })
   @ApiResponse({
     status: 200,
     description: 'Invoices retrieved successfully.',
   })
-  @ApiResponse({
-    status: 401,
-    description: 'Authentication required.',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Insufficient permissions.',
-  })
+  @ApiResponse({ status: 401, description: 'Authentication required.' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions.' })
   findAll(
     @Req() req: AuthenticatedRequest,
     @Query() query: InvoiceQueryDto,
@@ -122,31 +105,44 @@ export class InvoicesController {
   }
 
   // ===========================================================================
+  // SUMMARY
+  // ===========================================================================
+
+  @Get('summary')
+  @Permissions(PermissionCodes.BILLING_READ)
+  @ApiOperation({
+    summary: 'Get billing summary',
+    description:
+      'Returns invoice counts and current billing totals for the authenticated clinic. Draft, cancelled, and refunded invoices are excluded from the active financial totals.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Billing summary retrieved successfully.',
+    type: InvoiceSummaryResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Authentication required.' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions.' })
+  getSummary(
+    @Req() req: AuthenticatedRequest,
+  ): Promise<InvoiceSummaryResponseDto> {
+    return this.invoicesService.getSummary(req.user.clinicId);
+  }
+
+  // ===========================================================================
   // GET BY ID
   // ===========================================================================
 
   @Get(':id')
   @Permissions(PermissionCodes.BILLING_READ)
-  @ApiOperation({
-    summary: 'Get invoice by ID',
-  })
+  @ApiOperation({ summary: 'Get invoice by ID' })
   @ApiResponse({
     status: 200,
     description: 'Invoice retrieved successfully.',
     type: InvoiceResponseDto,
   })
-  @ApiResponse({
-    status: 401,
-    description: 'Authentication required.',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Insufficient permissions.',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Invoice not found.',
-  })
+  @ApiResponse({ status: 401, description: 'Authentication required.' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions.' })
+  @ApiResponse({ status: 404, description: 'Invoice not found.' })
   findOne(
     @Req() req: AuthenticatedRequest,
     @Param('id', new ParseUUIDPipe()) id: string,
@@ -174,18 +170,9 @@ export class InvoicesController {
     status: 400,
     description: 'Invoice cannot be updated in its current state.',
   })
-  @ApiResponse({
-    status: 401,
-    description: 'Authentication required.',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Insufficient permissions.',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Invoice not found.',
-  })
+  @ApiResponse({ status: 401, description: 'Authentication required.' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions.' })
+  @ApiResponse({ status: 404, description: 'Invoice not found.' })
   update(
     @Req() req: AuthenticatedRequest,
     @Param('id', new ParseUUIDPipe()) id: string,
@@ -195,7 +182,7 @@ export class InvoicesController {
   }
 
   // ===========================================================================
-  // ADD ITEM
+  // ADD MANUAL ITEM
   // ===========================================================================
 
   @Post(':id/items')
@@ -203,7 +190,7 @@ export class InvoicesController {
   @ApiOperation({
     summary: 'Add item to invoice',
     description:
-      'Adds a line item to a draft invoice and recalculates invoice totals.',
+      'Adds a manual line item to a draft invoice and recalculates invoice totals.',
   })
   @ApiResponse({
     status: 201,
@@ -212,20 +199,11 @@ export class InvoicesController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Invoice cannot be modified in its current state.',
+    description: 'Invoice cannot be modified or item data is invalid.',
   })
-  @ApiResponse({
-    status: 401,
-    description: 'Authentication required.',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Insufficient permissions.',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Invoice not found.',
-  })
+  @ApiResponse({ status: 401, description: 'Authentication required.' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions.' })
+  @ApiResponse({ status: 404, description: 'Invoice not found.' })
   addItem(
     @Req() req: AuthenticatedRequest,
     @Param('id', new ParseUUIDPipe()) id: string,
@@ -235,7 +213,7 @@ export class InvoicesController {
   }
 
   // ===========================================================================
-  // REMOVE ITEM
+  // REMOVE MANUAL ITEM
   // ===========================================================================
 
   @Delete(':id/items/:itemId')
@@ -243,7 +221,7 @@ export class InvoicesController {
   @ApiOperation({
     summary: 'Remove item from invoice',
     description:
-      'Removes a line item from a draft invoice and recalculates invoice totals.',
+      'Removes a manual line item from a draft invoice. System-generated lab and pharmacy items cannot be removed through this endpoint.',
   })
   @ApiResponse({
     status: 200,
@@ -252,16 +230,10 @@ export class InvoicesController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Invoice cannot be modified or would have no items.',
+    description: 'Invoice cannot be modified or item cannot be removed.',
   })
-  @ApiResponse({
-    status: 401,
-    description: 'Authentication required.',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Insufficient permissions.',
-  })
+  @ApiResponse({ status: 401, description: 'Authentication required.' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions.' })
   @ApiResponse({
     status: 404,
     description: 'Invoice or invoice item not found.',
@@ -272,6 +244,90 @@ export class InvoicesController {
     @Param('itemId', new ParseUUIDPipe()) itemId: string,
   ): Promise<InvoiceResponseDto> {
     return this.invoicesService.removeItem(req.user.clinicId, id, itemId);
+  }
+
+  // ===========================================================================
+  // ADD LAB ORDER ITEMS
+  // ===========================================================================
+
+  @Post(':id/lab-orders/:labOrderId')
+  @Permissions(PermissionCodes.BILLING_UPDATE)
+  @ApiOperation({
+    summary: 'Add laboratory charges to invoice',
+    description:
+      'Adds all unbilled laboratory order items to a draft invoice using the actual laboratory item prices.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Laboratory charges added successfully.',
+    type: InvoiceResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invoice or laboratory order cannot be billed.',
+  })
+  @ApiResponse({ status: 401, description: 'Authentication required.' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions.' })
+  @ApiResponse({
+    status: 404,
+    description: 'Invoice or laboratory order not found.',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Laboratory tests are already billed.',
+  })
+  addLabOrderItems(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', new ParseUUIDPipe()) invoiceId: string,
+    @Param('labOrderId', new ParseUUIDPipe()) labOrderId: string,
+  ): Promise<InvoiceResponseDto> {
+    return this.invoicesService.addLabOrderItems(
+      req.user.clinicId,
+      invoiceId,
+      labOrderId,
+    );
+  }
+
+  // ===========================================================================
+  // ADD PHARMACY DISPENSING ITEMS
+  // ===========================================================================
+
+  @Post(':id/dispensings/:dispensingId')
+  @Permissions(PermissionCodes.BILLING_UPDATE)
+  @ApiOperation({
+    summary: 'Add pharmacy charges to invoice',
+    description:
+      'Adds all unbilled pharmacy dispensing items to a draft invoice using the actual dispensed quantities and prices.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Pharmacy charges added successfully.',
+    type: InvoiceResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invoice or dispensing cannot be billed.',
+  })
+  @ApiResponse({ status: 401, description: 'Authentication required.' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions.' })
+  @ApiResponse({
+    status: 404,
+    description: 'Invoice or dispensing not found.',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Pharmacy dispensing items are already billed.',
+  })
+  addPharmacyDispensingItems(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', new ParseUUIDPipe()) invoiceId: string,
+    @Param('dispensingId', new ParseUUIDPipe()) dispensingId: string,
+  ): Promise<InvoiceResponseDto> {
+    return this.invoicesService.addPharmacyDispensingItems(
+      req.user.clinicId,
+      invoiceId,
+      dispensingId,
+    );
   }
 
   // ===========================================================================
@@ -293,18 +349,9 @@ export class InvoicesController {
     status: 400,
     description: 'Invoice cannot be issued in its current state.',
   })
-  @ApiResponse({
-    status: 401,
-    description: 'Authentication required.',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Insufficient permissions.',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Invoice not found.',
-  })
+  @ApiResponse({ status: 401, description: 'Authentication required.' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions.' })
+  @ApiResponse({ status: 404, description: 'Invoice not found.' })
   issue(
     @Req() req: AuthenticatedRequest,
     @Param('id', new ParseUUIDPipe()) id: string,
@@ -330,18 +377,9 @@ export class InvoicesController {
     status: 400,
     description: 'Invoice cannot be cancelled.',
   })
-  @ApiResponse({
-    status: 401,
-    description: 'Authentication required.',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Insufficient permissions.',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Invoice not found.',
-  })
+  @ApiResponse({ status: 401, description: 'Authentication required.' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions.' })
+  @ApiResponse({ status: 404, description: 'Invoice not found.' })
   cancel(
     @Req() req: AuthenticatedRequest,
     @Param('id', new ParseUUIDPipe()) id: string,

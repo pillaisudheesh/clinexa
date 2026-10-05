@@ -9,15 +9,39 @@ import {
   Min,
 } from 'class-validator';
 
+const toBoolean = ({ value }: { value: unknown }) => {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+
+    if (normalized === 'true') {
+      return true;
+    }
+
+    if (normalized === 'false') {
+      return false;
+    }
+  }
+
+  return value;
+};
+
 export class MedicineBatchQueryDto {
   @IsOptional()
-  @Transform(({ value }: { value: string }) => Number(value))
+  @Transform(({ value }: { value: string | number }) => Number(value))
   @IsInt()
   @Min(1)
   page = 1;
 
   @IsOptional()
-  @Transform(({ value }: { value: string }) => Number(value))
+  @Transform(({ value }: { value: string | number }) => Number(value))
   @IsInt()
   @Min(1)
   @Max(100)
@@ -32,17 +56,17 @@ export class MedicineBatchQueryDto {
   medicineId?: string;
 
   @IsOptional()
-  @Transform(({ value }: { value: string }) => value === 'true')
+  @Transform(toBoolean)
   @IsBoolean()
   lowStock?: boolean;
 
   @IsOptional()
-  @Transform(({ value }: { value: string }) => value === 'true')
+  @Transform(toBoolean)
   @IsBoolean()
   expired?: boolean;
 
   @IsOptional()
-  @Transform(({ value }: { value: string }) => value === 'true')
+  @Transform(toBoolean)
   @IsBoolean()
   isActive?: boolean;
 }

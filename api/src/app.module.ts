@@ -28,6 +28,12 @@ import { LabOrdersModule } from './lab-orders/lab-orders.module';
 import { PharmacyModule } from './pharmacy/pharmacy.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { MedicinesModule } from './medicines/medicines.module';
+import { SpecialtyModule } from './specialty/specialty.module';
+import { QualificationModule } from './qualification/qualification.module';
+import { LanguageModule } from './language/language.module';
+import { RegistrationCouncilModule } from './registration-council/registration-council.module';
+import { BillingModule } from './billing/billing.module';
 
 @Module({
   imports: [
@@ -58,6 +64,12 @@ import { DashboardModule } from './dashboard/dashboard.module';
     PharmacyModule,
     InventoryModule,
     DashboardModule,
+    MedicinesModule,
+    SpecialtyModule,
+    QualificationModule,
+    LanguageModule,
+    RegistrationCouncilModule,
+    BillingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

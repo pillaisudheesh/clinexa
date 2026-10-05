@@ -165,6 +165,8 @@ model Clinic {
   inventoryTransactions InventoryTransaction[]
   pharmacyDispensings   PharmacyDispensing[]
   stockReceipts         StockReceipt[]
+  prescriptionSequence Int @default(0)
+  invoiceSequence      Int @default(0)
 
   @@index([isActive])
 }
@@ -761,6 +763,7 @@ model Prescription {
 
   createdAt  DateTime            @default(now())
   dispensing PharmacyDispensing?
+  prescriptionNumber String @unique
 
   @@index([medicalRecordId])
   @@index([medicineId])
@@ -1110,6 +1113,7 @@ model PharmacyDispensingItem {
 }
 
 enum PharmacyDispensingStatus {
+  PARTIALLY_DISPENSED
   COMPLETED
   CANCELLED
 }

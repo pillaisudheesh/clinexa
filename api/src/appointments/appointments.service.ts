@@ -1073,6 +1073,7 @@ export class AppointmentsService {
 
   private mapPrescription(prescription: {
     id: string;
+    prescriptionNumber: string;
     medicalRecordId: string;
     medicineId: string;
     medicationName: string;
@@ -1086,6 +1087,8 @@ export class AppointmentsService {
   }): PrescriptionResponseDto {
     return {
       id: prescription.id,
+
+      prescriptionNumber: prescription.prescriptionNumber,
 
       medicalRecordId: prescription.medicalRecordId,
 

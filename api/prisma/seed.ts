@@ -11,6 +11,7 @@ import { seedSpecialties } from './seeds/specialty.seed';
 import { qualifications } from './data/master/qualifications';
 import { languages } from './data/master/languages';
 import { registrationCouncils } from './data/master/registration-councils';
+import { seedLabTests } from './seeds/lab-test.seed';
 
 const prisma = new PrismaClient();
 
@@ -31,6 +32,7 @@ async function main() {
 
   await seedDepartments(clinic.id);
   await seedSpecialties(clinic.id);
+  await seedLabTests(prisma, clinic.id);
 
   // ============================================================
   // Qualifications

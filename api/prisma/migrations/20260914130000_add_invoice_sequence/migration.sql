@@ -1,0 +1,1 @@
+ALTER TABLE "Clinic" ADD COLUMN "invoiceSequence" INTEGER NOT NULL DEFAULT 0;

@@ -880,257 +880,225 @@ export class InventoryService {
       throw new BadRequestException('At least one medicine is required');
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      // ---------------------------------------------------------------------
-      // 1. Prevent duplicate receipt number
-      // ---------------------------------------------------------------------
-
-      const existingReceipt = await tx.stockReceipt.findFirst({
-        where: {
-          clinicId,
-          receiptNumber: dto.receiptNumber,
-        },
-      });
-
-      if (existingReceipt) {
-        throw new ConflictException('Receipt number already exists');
-      }
-
-      // ---------------------------------------------------------------------
-      // 2. Validate all medicines
-      // ---------------------------------------------------------------------
-
-      const medicineIds = [
-        ...new Set(dto.items.map((item) => item.medicineId)),
-      ];
-
-      const medicines = await tx.medicine.findMany({
-        where: {
-          clinicId,
-          id: {
-            in: medicineIds,
-          },
-          isActive: true,
-        },
-        select: {
-          id: true,
-          name: true,
-        },
-      });
-
-      const medicineMap = new Map(
-        medicines.map((medicine) => [medicine.id, medicine]),
-      );
-
-      for (const item of dto.items) {
-        if (!medicineMap.has(item.medicineId)) {
-          throw new NotFoundException(
-            `Active medicine not found: ${item.medicineId}`,
-          );
-        }
-
-        if (new Date(item.expiryDate) <= new Date()) {
-          throw new BadRequestException(
-            `Medicine batch ${item.batchNumber} has an invalid expiry date`,
-          );
-        }
-
-        if (item.sellingPrice < item.purchasePrice) {
-          throw new BadRequestException(
-            `Selling price cannot be lower than purchase price for batch ${item.batchNumber}`,
-          );
-        }
-      }
-
-      // ---------------------------------------------------------------------
-      // 3. Create receipt
-      // ---------------------------------------------------------------------
-
-      let totalAmount = new Prisma.Decimal(0);
-
-      const receipt = await tx.stockReceipt.create({
-        data: {
-          clinicId,
-
-          receiptNumber: dto.receiptNumber,
-
-          supplierName: dto.supplierName,
-
-          supplierInvoiceNumber: dto.supplierInvoiceNumber,
-
-          notes: dto.notes,
-
-          totalAmount,
-        },
-      });
-
-      // ---------------------------------------------------------------------
-      // 4. Process each received item
-      // ---------------------------------------------------------------------
-
-      for (const item of dto.items) {
-        const purchasePrice = new Prisma.Decimal(item.purchasePrice);
-
-        const sellingPrice = new Prisma.Decimal(item.sellingPrice);
-
-        const amount = purchasePrice.mul(item.quantity);
-
-        totalAmount = totalAmount.add(amount);
-
-        // -------------------------------------------------------------------
-        // Check whether this exact batch already exists
-        // -------------------------------------------------------------------
-
-        const existingBatch = await tx.medicineBatch.findFirst({
-          where: {
-            clinicId,
-            medicineId: item.medicineId,
-            batchNumber: item.batchNumber,
-          },
-        });
-
-        let batch;
-
-        if (existingBatch) {
-          // ---------------------------------------------------------------
-          // Existing batch → increase quantity
-          // ---------------------------------------------------------------
-
-          batch = await tx.medicineBatch.update({
-            where: {
-              id: existingBatch.id,
-            },
-
-            data: {
-              quantity: existingBatch.quantity + item.quantity,
-
-              purchasePrice,
-
-              sellingPrice,
-
-              expiryDate: new Date(item.expiryDate),
-
-              ...(item.reorderLevel !== undefined && {
-                reorderLevel: item.reorderLevel,
-              }),
-
-              isActive: true,
-            },
-          });
-        } else {
-          // ---------------------------------------------------------------
-          // New batch
-          // ---------------------------------------------------------------
-
-          batch = await tx.medicineBatch.create({
-            data: {
+    // Receipt numbers are generated server-side. Serializable transactions plus
+    // retry handling prevent two concurrent stock receipts from receiving the
+    // same number.
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(
+          async (tx) => {
+            const receiptNumber = await this.generateReceiptNumber(
+              tx,
               clinicId,
+            );
 
-              medicineId: item.medicineId,
+            // -------------------------------------------------------------------
+            // 1. Validate all medicines
+            // -------------------------------------------------------------------
 
-              batchNumber: item.batchNumber,
+            const medicineIds = [
+              ...new Set(dto.items.map((item) => item.medicineId)),
+            ];
 
-              expiryDate: new Date(item.expiryDate),
+            const medicines = await tx.medicine.findMany({
+              where: {
+                clinicId,
+                id: {
+                  in: medicineIds,
+                },
+                isActive: true,
+              },
+              select: {
+                id: true,
+                name: true,
+              },
+            });
 
-              quantity: item.quantity,
+            const medicineMap = new Map(
+              medicines.map((medicine) => [medicine.id, medicine]),
+            );
 
-              purchasePrice,
+            for (const item of dto.items) {
+              if (!medicineMap.has(item.medicineId)) {
+                throw new NotFoundException(
+                  `Active medicine not found: ${item.medicineId}`,
+                );
+              }
 
-              sellingPrice,
+              if (new Date(item.expiryDate) <= new Date()) {
+                throw new BadRequestException(
+                  `Medicine batch ${item.batchNumber} has an invalid expiry date`,
+                );
+              }
 
-              reorderLevel: item.reorderLevel ?? 0,
+              if (item.sellingPrice < item.purchasePrice) {
+                throw new BadRequestException(
+                  `Selling price cannot be lower than purchase price for batch ${item.batchNumber}`,
+                );
+              }
+            }
 
-              isActive: true,
-            },
-          });
+            // -------------------------------------------------------------------
+            // 2. Create receipt
+            // -------------------------------------------------------------------
+
+            let totalAmount = new Prisma.Decimal(0);
+
+            const receipt = await tx.stockReceipt.create({
+              data: {
+                clinicId,
+                receiptNumber,
+                supplierName: dto.supplierName,
+                supplierInvoiceNumber: dto.supplierInvoiceNumber,
+                notes: dto.notes,
+                totalAmount,
+              },
+            });
+
+            // -------------------------------------------------------------------
+            // 3. Process each received item
+            // -------------------------------------------------------------------
+
+            for (const item of dto.items) {
+              const purchasePrice = new Prisma.Decimal(item.purchasePrice);
+              const sellingPrice = new Prisma.Decimal(item.sellingPrice);
+              const amount = purchasePrice.mul(item.quantity);
+
+              totalAmount = totalAmount.add(amount);
+
+              const existingBatch = await tx.medicineBatch.findFirst({
+                where: {
+                  clinicId,
+                  medicineId: item.medicineId,
+                  batchNumber: item.batchNumber,
+                },
+              });
+
+              let batch;
+
+              if (existingBatch) {
+                batch = await tx.medicineBatch.update({
+                  where: { id: existingBatch.id },
+                  data: {
+                    quantity: existingBatch.quantity + item.quantity,
+                    purchasePrice,
+                    sellingPrice,
+                    expiryDate: new Date(item.expiryDate),
+                    ...(item.reorderLevel !== undefined && {
+                      reorderLevel: item.reorderLevel,
+                    }),
+                    isActive: true,
+                  },
+                });
+              } else {
+                batch = await tx.medicineBatch.create({
+                  data: {
+                    clinicId,
+                    medicineId: item.medicineId,
+                    batchNumber: item.batchNumber,
+                    expiryDate: new Date(item.expiryDate),
+                    quantity: item.quantity,
+                    purchasePrice,
+                    sellingPrice,
+                    reorderLevel: item.reorderLevel ?? 0,
+                    isActive: true,
+                  },
+                });
+              }
+
+              await tx.stockReceiptItem.create({
+                data: {
+                  receiptId: receipt.id,
+                  medicineId: item.medicineId,
+                  medicineBatchId: batch.id,
+                  quantity: item.quantity,
+                  purchasePrice,
+                  sellingPrice,
+                  amount,
+                },
+              });
+
+              await tx.inventoryTransaction.create({
+                data: {
+                  clinicId,
+                  medicineBatchId: batch.id,
+                  type: InventoryTransactionType.PURCHASE,
+                  quantity: item.quantity,
+                  previousQuantity: existingBatch?.quantity ?? 0,
+                  newQuantity: batch.quantity,
+                  referenceId: receipt.id,
+                  notes: `Stock received - ${receiptNumber}`,
+                },
+              });
+            }
+
+            await tx.stockReceipt.update({
+              where: { id: receipt.id },
+              data: { totalAmount },
+            });
+
+            const result = await tx.stockReceipt.findUnique({
+              where: { id: receipt.id },
+              include: {
+                items: {
+                  include: {
+                    medicine: true,
+                    medicineBatch: true,
+                  },
+                },
+              },
+            });
+
+            if (!result) {
+              throw new NotFoundException('Stock receipt not found');
+            }
+
+            return this.mapStockReceipt(result);
+          },
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        );
+      } catch (error) {
+        // PostgreSQL serializable transactions can abort under concurrent
+        // receipt creation. Retry a few times; other errors are propagated.
+        const code = (error as { code?: string }).code;
+        if ((code === 'P2034' || code === 'P2002') && attempt < 3) {
+          continue;
         }
-
-        // -------------------------------------------------------------------
-        // Receipt item
-        // -------------------------------------------------------------------
-
-        await tx.stockReceiptItem.create({
-          data: {
-            receiptId: receipt.id,
-
-            medicineId: item.medicineId,
-
-            medicineBatchId: batch.id,
-
-            quantity: item.quantity,
-
-            purchasePrice,
-
-            sellingPrice,
-
-            amount,
-          },
-        });
-
-        // -------------------------------------------------------------------
-        // Inventory transaction
-        // -------------------------------------------------------------------
-
-        await tx.inventoryTransaction.create({
-          data: {
-            clinicId,
-
-            medicineBatchId: batch.id,
-
-            type: InventoryTransactionType.PURCHASE,
-
-            quantity: item.quantity,
-
-            previousQuantity: existingBatch?.quantity ?? 0,
-
-            newQuantity: batch.quantity,
-
-            referenceId: receipt.id,
-
-            notes: `Stock received - ${dto.receiptNumber}`,
-          },
-        });
+        if (code === 'P2002') {
+          throw new ConflictException(
+            'Unable to generate a unique receipt number',
+          );
+        }
+        throw error;
       }
+    }
 
-      // ---------------------------------------------------------------------
-      // 5. Update receipt total
-      // ---------------------------------------------------------------------
+    throw new ConflictException('Unable to create stock receipt');
+  }
 
-      await tx.stockReceipt.update({
-        where: {
-          id: receipt.id,
+  private async generateReceiptNumber(
+    tx: Prisma.TransactionClient,
+    clinicId: string,
+  ): Promise<string> {
+    const year = new Date().getFullYear();
+
+    const latestReceipt = await tx.stockReceipt.findFirst({
+      where: {
+        clinicId,
+        receiptNumber: {
+          startsWith: `GRN-${year}-`,
         },
-
-        data: {
-          totalAmount,
-        },
-      });
-
-      // ---------------------------------------------------------------------
-      // 6. Return complete receipt
-      // ---------------------------------------------------------------------
-
-      const result = await tx.stockReceipt.findUnique({
-        where: {
-          id: receipt.id,
-        },
-
-        include: {
-          items: {
-            include: {
-              medicine: true,
-              medicineBatch: true,
-            },
-          },
-        },
-      });
-
-      if (!result) {
-        throw new NotFoundException('Stock receipt not found');
-      }
-
-      return this.mapStockReceipt(result);
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { receiptNumber: true },
     });
+
+    const match = latestReceipt?.receiptNumber.match(
+      new RegExp(`^GRN-${year}-(\\d+)$`),
+    );
+    const nextSequence = match ? Number(match[1]) + 1 : 1;
+
+    return `GRN-${year}-${String(nextSequence).padStart(6, '0')}`;
   }
 
   // ===========================================================================

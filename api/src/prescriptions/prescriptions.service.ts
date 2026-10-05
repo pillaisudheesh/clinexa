@@ -67,34 +67,73 @@ export class PrescriptionsService {
     }
 
     // -------------------------------------------------------------------------
-    // Create prescription
+    // Generate prescription number and create prescription atomically
     // -------------------------------------------------------------------------
 
-    const prescription = await this.prisma.prescription.create({
-      data: {
-        medicalRecordId: medicalRecord.id,
+    const prescription = await this.prisma.$transaction(async (tx) => {
+      // Increment the clinic-specific prescription sequence.
+      // This is atomic and safe when multiple prescriptions are created
+      // concurrently.
+      const clinic = await tx.clinic.update({
+        where: {
+          id: clinicId,
+        },
 
-        medicineId: medicine.id,
+        data: {
+          prescriptionSequence: {
+            increment: 1,
+          },
+        },
 
-        // Snapshot medicine name
-        medicationName: medicine.name,
+        select: {
+          prescriptionSequence: true,
+        },
+      });
 
-        dosage: dto.dosage,
+      const currentYear = new Date().getFullYear();
 
-        frequency: dto.frequency,
+      const prescriptionNumber = `RX-${currentYear}-${String(
+        clinic.prescriptionSequence,
+      ).padStart(6, '0')}`;
 
-        route: dto.route,
+      console.log('========== PRESCRIPTION DEBUG ==========');
+      console.log('clinicId:', clinicId);
+      console.log('prescriptionSequence:', clinic.prescriptionSequence);
+      console.log('prescriptionNumber:', prescriptionNumber);
+      console.log('=========================================');
 
-        duration: dto.duration,
+      // -----------------------------------------------------------------------
+      // Create prescription
+      // -----------------------------------------------------------------------
 
-        quantity: dto.quantity,
+      return tx.prescription.create({
+        data: {
+          prescriptionNumber,
 
-        instructions: dto.instructions,
-      },
+          medicalRecordId: medicalRecord.id,
 
-      include: {
-        medicine: true,
-      },
+          medicineId: medicine.id,
+
+          // Snapshot medicine name
+          medicationName: medicine.name,
+
+          dosage: dto.dosage,
+
+          frequency: dto.frequency,
+
+          route: dto.route,
+
+          duration: dto.duration,
+
+          quantity: dto.quantity,
+
+          instructions: dto.instructions,
+        },
+
+        include: {
+          medicine: true,
+        },
+      });
     });
 
     return this.mapPrescription(prescription);
@@ -406,6 +445,8 @@ export class PrescriptionsService {
   ): PrescriptionResponseDto {
     return {
       id: prescription.id,
+
+      prescriptionNumber: prescription.prescriptionNumber,
 
       medicalRecordId: prescription.medicalRecordId,
 

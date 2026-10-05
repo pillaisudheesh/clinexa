@@ -19,6 +19,32 @@ import { UpdateLabOrderStatusDto } from './dto/update-lab-order-status.dto';
 
 type LabOrderWithItems = Prisma.LabOrderGetPayload<{
   include: {
+    appointment: {
+      select: {
+        id: true;
+        appointmentNumber: true;
+        appointmentDate: true;
+        startTime: true;
+        endTime: true;
+        status: true;
+        patient: {
+          select: {
+            id: true;
+            patientNumber: true;
+            firstName: true;
+            lastName: true;
+          };
+        };
+        doctor: {
+          select: {
+            id: true;
+            doctorNumber: true;
+            firstName: true;
+            lastName: true;
+          };
+        };
+      };
+    };
     labOrderItems: {
       include: {
         labTest: true;
@@ -27,6 +53,35 @@ type LabOrderWithItems = Prisma.LabOrderGetPayload<{
     };
   };
 }>;
+
+const appointmentInclude = {
+  appointment: {
+    select: {
+      id: true,
+      appointmentNumber: true,
+      appointmentDate: true,
+      startTime: true,
+      endTime: true,
+      status: true,
+      patient: {
+        select: {
+          id: true,
+          patientNumber: true,
+          firstName: true,
+          lastName: true,
+        },
+      },
+      doctor: {
+        select: {
+          id: true,
+          doctorNumber: true,
+          firstName: true,
+          lastName: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.LabOrderInclude;
 
 @Injectable()
 export class LabOrdersService {
@@ -69,12 +124,10 @@ export class LabOrdersService {
       const existingOrder = await tx.labOrder.findFirst({
         where: {
           appointmentId: appointment.id,
-
           status: {
             not: LabOrderStatus.CANCELLED,
           },
         },
-
         select: {
           id: true,
         },
@@ -95,12 +148,9 @@ export class LabOrdersService {
           id: {
             in: dto.labTestIds,
           },
-
           clinicId,
-
           isActive: true,
         },
-
         select: {
           id: true,
           code: true,
@@ -134,15 +184,10 @@ export class LabOrdersService {
       return tx.labOrder.create({
         data: {
           clinicId,
-
           patientId: appointment.patientId,
-
           doctorId: appointment.doctorId,
-
           appointmentId: appointment.id,
-
           status: LabOrderStatus.PENDING,
-
           notes: dto.notes,
 
           labOrderItems: {
@@ -159,6 +204,7 @@ export class LabOrdersService {
         },
 
         include: {
+          ...appointmentInclude,
           labOrderItems: {
             include: {
               labTest: true,
@@ -231,7 +277,6 @@ export class LabOrdersService {
                         mode: 'insensitive',
                       },
                     },
-
                     {
                       name: {
                         contains: search,
@@ -259,6 +304,7 @@ export class LabOrdersService {
         },
 
         include: {
+          ...appointmentInclude,
           labOrderItems: {
             include: {
               labTest: true,
@@ -298,6 +344,7 @@ export class LabOrdersService {
       },
 
       include: {
+        ...appointmentInclude,
         labOrderItems: {
           include: {
             labTest: true,
@@ -373,6 +420,7 @@ export class LabOrdersService {
       },
 
       include: {
+        ...appointmentInclude,
         labOrderItems: {
           include: {
             labTest: true,
@@ -683,6 +731,19 @@ export class LabOrdersService {
       doctorId: order.doctorId,
 
       appointmentId: order.appointmentId,
+
+      appointment: order.appointment
+        ? {
+            id: order.appointment.id,
+            appointmentNumber: order.appointment.appointmentNumber,
+            appointmentDate: order.appointment.appointmentDate,
+            startTime: order.appointment.startTime,
+            endTime: order.appointment.endTime,
+            status: order.appointment.status,
+            patient: order.appointment.patient,
+            doctor: order.appointment.doctor,
+          }
+        : null,
 
       status: order.status,
 

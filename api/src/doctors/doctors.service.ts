@@ -237,16 +237,13 @@ export class DoctorsService {
 
     return {
       data: DoctorMapper.toResponseList(doctors),
+      page,
 
-      meta: {
-        page,
+      limit,
 
-        limit,
+      total,
 
-        total,
-
-        totalPages: Math.ceil(total / limit),
-      },
+      totalPages: Math.ceil(total / limit),
     };
   }
 

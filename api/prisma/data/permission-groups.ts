@@ -55,42 +55,49 @@ export const permissionGroups = [
   },
 
   {
+    code: 'PRESCRIPTION',
+    name: 'Prescriptions',
+    displayOrder: 11,
+  },
+
+  {
     code: 'DIAGNOSIS',
     name: 'Diagnosis',
+    displayOrder: 12,
   },
 
   // Clinical Support
   {
     code: 'LABORATORY',
     name: 'Laboratory',
-    displayOrder: 11,
+    displayOrder: 13,
   },
   {
     code: 'PHARMACY',
     name: 'Pharmacy',
-    displayOrder: 12,
+    displayOrder: 14,
   },
   {
     code: 'BILLING',
     name: 'Billing',
-    displayOrder: 13,
+    displayOrder: 15,
   },
   {
     code: 'INVENTORY',
     name: 'Inventory',
-    displayOrder: 14,
+    displayOrder: 16,
   },
 
   // Administration
   {
     code: 'REPORTS',
     name: 'Reports',
-    displayOrder: 15,
+    displayOrder: 17,
   },
   {
     code: 'SETTINGS',
     name: 'System Settings',
-    displayOrder: 16,
+    displayOrder: 18,
   },
 
   {

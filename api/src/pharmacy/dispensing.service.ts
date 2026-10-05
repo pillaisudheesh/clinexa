@@ -56,7 +56,7 @@ export class DispensingService {
       }
 
       // -----------------------------------------------------------------------
-      // 2. Prevent duplicate dispensing
+      // 2. Load an existing dispensing, if this is a subsequent partial issue
       // -----------------------------------------------------------------------
 
       const existing = await tx.pharmacyDispensing.findUnique({
@@ -65,29 +65,71 @@ export class DispensingService {
         },
         select: {
           id: true,
+          invoiceId: true,
+          status: true,
+          items: {
+            select: {
+              quantity: true,
+            },
+          },
         },
       });
 
-      if (existing) {
+      if (existing?.status === PharmacyDispensingStatus.COMPLETED) {
         throw new ConflictException(
-          'This prescription has already been dispensed',
+          'This prescription has already been fully dispensed',
         );
       }
+
+      if (existing?.status === PharmacyDispensingStatus.CANCELLED) {
+        throw new ConflictException(
+          'A cancelled dispensing cannot be resumed; create a new prescription if medicine is still required',
+        );
+      }
+
+      if (
+        existing?.invoiceId &&
+        dto.invoiceId &&
+        existing.invoiceId !== dto.invoiceId
+      ) {
+        throw new BadRequestException(
+          'All partial dispensing charges must use the same invoice',
+        );
+      }
+
+      const invoiceId = dto.invoiceId ?? existing?.invoiceId;
 
       // -----------------------------------------------------------------------
       // 3. Parse prescription quantity
       // -----------------------------------------------------------------------
 
-      const requestedQuantity = this.parseQuantity(prescription.quantity);
+      const prescribedQuantity = this.parseQuantity(prescription.quantity);
+      const alreadyDispensed =
+        existing?.items.reduce((total, item) => total + item.quantity, 0) ?? 0;
+      const outstandingQuantity = prescribedQuantity - alreadyDispensed;
+
+      if (outstandingQuantity <= 0) {
+        throw new ConflictException(
+          'This prescription has already been fully dispensed',
+        );
+      }
+
+      const requestedQuantity = dto.quantity ?? outstandingQuantity;
+
+      if (requestedQuantity > outstandingQuantity) {
+        throw new BadRequestException(
+          `Requested dispensing quantity ${requestedQuantity} exceeds the outstanding quantity of ${outstandingQuantity}`,
+        );
+      }
 
       // -----------------------------------------------------------------------
       // 4. Validate invoice if supplied
       // -----------------------------------------------------------------------
 
-      if (dto.invoiceId) {
+      if (invoiceId) {
         const invoice = await tx.invoice.findFirst({
           where: {
-            id: dto.invoiceId,
+            id: invoiceId,
             clinicId,
           },
           select: {
@@ -155,23 +197,28 @@ export class DispensingService {
       // 6. Create dispensing record
       // -----------------------------------------------------------------------
 
-      const dispensing = await tx.pharmacyDispensing.create({
-        data: {
-          clinicId,
-
-          prescriptionId,
-
-          invoiceId: dto.invoiceId,
-
-          status: PharmacyDispensingStatus.COMPLETED,
-        },
-      });
+      const dispensing = existing
+        ? await tx.pharmacyDispensing.update({
+            where: { id: existing.id },
+            data: {
+              ...(invoiceId && !existing.invoiceId ? { invoiceId } : {}),
+            },
+          })
+        : await tx.pharmacyDispensing.create({
+            data: {
+              clinicId,
+              prescriptionId,
+              invoiceId,
+              status: PharmacyDispensingStatus.PARTIALLY_DISPENSED,
+            },
+          });
 
       // -----------------------------------------------------------------------
       // 7. Allocate stock using FEFO
       // -----------------------------------------------------------------------
 
       let remaining = requestedQuantity;
+      const dispensingItemIds: string[] = [];
 
       for (const batch of batches) {
         if (remaining <= 0) {
@@ -190,14 +237,22 @@ export class DispensingService {
         // Update stock
         // ---------------------------------------------------------------------
 
-        await tx.medicineBatch.update({
+        const stockUpdate = await tx.medicineBatch.updateMany({
           where: {
             id: batch.id,
+            clinicId,
+            isActive: true,
+            expiryDate: { gt: now },
+            quantity: { gte: quantityToDispense },
           },
-          data: {
-            quantity: newQuantity,
-          },
+          data: { quantity: newQuantity },
         });
+
+        if (stockUpdate.count !== 1) {
+          throw new ConflictException(
+            `Stock changed while dispensing batch ${batch.batchNumber}; please retry`,
+          );
+        }
 
         // ---------------------------------------------------------------------
         // Inventory audit
@@ -227,7 +282,7 @@ export class DispensingService {
         // Dispensing item
         // ---------------------------------------------------------------------
 
-        await tx.pharmacyDispensingItem.create({
+        const dispensingItem = await tx.pharmacyDispensingItem.create({
           data: {
             dispensingId: dispensing.id,
 
@@ -243,6 +298,8 @@ export class DispensingService {
           },
         });
 
+        dispensingItemIds.push(dispensingItem.id);
+
         remaining -= quantityToDispense;
       }
 
@@ -250,8 +307,18 @@ export class DispensingService {
       // 8. Add pharmacy charges to invoice
       // -----------------------------------------------------------------------
 
-      if (dto.invoiceId) {
-        await this.addToInvoice(tx, clinicId, dto.invoiceId, dispensing.id);
+      const dispensingStatus =
+        alreadyDispensed + requestedQuantity === prescribedQuantity
+          ? PharmacyDispensingStatus.COMPLETED
+          : PharmacyDispensingStatus.PARTIALLY_DISPENSED;
+
+      await tx.pharmacyDispensing.update({
+        where: { id: dispensing.id },
+        data: { status: dispensingStatus },
+      });
+
+      if (invoiceId) {
+        await this.addToInvoice(tx, clinicId, invoiceId, dispensingItemIds);
       }
 
       // -----------------------------------------------------------------------
@@ -289,7 +356,7 @@ export class DispensingService {
     tx: Prisma.TransactionClient,
     clinicId: string,
     invoiceId: string,
-    dispensingId: string,
+    dispensingItemIds: string[],
   ): Promise<void> {
     const invoice = await tx.invoice.findFirst({
       where: {
@@ -314,7 +381,7 @@ export class DispensingService {
 
     const items = await tx.pharmacyDispensingItem.findMany({
       where: {
-        dispensingId,
+        id: { in: dispensingItemIds },
       },
       include: {
         medicine: true,

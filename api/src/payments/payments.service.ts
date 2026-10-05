@@ -40,127 +40,121 @@ export class PaymentsService {
     clinicId: string,
     dto: CreatePaymentDto,
   ): Promise<PaymentResponseDto> {
-    if (dto.amount <= 0) {
+    if (!Number.isFinite(dto.amount) || dto.amount <= 0) {
       throw new BadRequestException('Payment amount must be greater than zero');
-    }
-
-    const invoice = await this.prisma.invoice.findFirst({
-      where: {
-        id: dto.invoiceId,
-        clinicId,
-      },
-    });
-
-    if (!invoice) {
-      throw new NotFoundException('Invoice not found');
-    }
-
-    if (
-      invoice.status === InvoiceStatus.CANCELLED ||
-      invoice.status === InvoiceStatus.REFUNDED
-    ) {
-      throw new BadRequestException(
-        'Payments cannot be added to a cancelled or refunded invoice',
-      );
-    }
-
-    if (invoice.status === InvoiceStatus.DRAFT) {
-      throw new BadRequestException(
-        'Invoice must be issued before accepting payment',
-      );
     }
 
     const amount = this.roundMoney(dto.amount);
 
-    const balanceDue = this.roundMoney(Number(invoice.balanceDue));
+    try {
+      const payment = await this.prisma.$transaction(
+        async (tx) => {
+          /*
+           * Read and validate the invoice inside the transaction.
+           *
+           * Serializable isolation prevents two concurrent payment requests
+           * from both using the same outstanding balance.
+           */
+          const invoice = await tx.invoice.findFirst({
+            where: {
+              id: dto.invoiceId,
+              clinicId,
+            },
+          });
 
-    if (amount > balanceDue) {
-      throw new BadRequestException(
-        `Payment amount cannot exceed the outstanding balance of ${balanceDue.toFixed(2)}`,
-      );
-    }
+          if (!invoice) {
+            throw new NotFoundException('Invoice not found');
+          }
 
-    const payment = await this.prisma.$transaction(async (tx) => {
-      /*
-       * Re-read the invoice inside the transaction.
-       *
-       * This ensures that the balance we use is current
-       * when multiple payment requests arrive close together.
-       */
-      const currentInvoice = await tx.invoice.findUnique({
-        where: {
-          id: invoice.id,
+          if (
+            invoice.status === InvoiceStatus.CANCELLED ||
+            invoice.status === InvoiceStatus.REFUNDED
+          ) {
+            throw new BadRequestException(
+              'Payments cannot be added to a cancelled or refunded invoice',
+            );
+          }
+
+          if (invoice.status === InvoiceStatus.DRAFT) {
+            throw new BadRequestException(
+              'Invoice must be issued before accepting payment',
+            );
+          }
+
+          const currentBalance = this.roundMoney(Number(invoice.balanceDue));
+
+          if (currentBalance <= 0) {
+            throw new BadRequestException('Invoice has no outstanding balance');
+          }
+
+          if (amount > currentBalance) {
+            throw new BadRequestException(
+              `Payment amount cannot exceed the outstanding balance of ${currentBalance.toFixed(2)}`,
+            );
+          }
+
+          const currentAmountPaid = this.roundMoney(Number(invoice.amountPaid));
+
+          const total = this.roundMoney(Number(invoice.total));
+
+          const newAmountPaid = this.roundMoney(currentAmountPaid + amount);
+
+          const newBalanceDue = this.roundMoney(
+            Math.max(total - newAmountPaid, 0),
+          );
+
+          const newInvoiceStatus =
+            newBalanceDue === 0
+              ? InvoiceStatus.PAID
+              : InvoiceStatus.PARTIALLY_PAID;
+
+          const createdPayment = await tx.payment.create({
+            data: {
+              invoiceId: invoice.id,
+              amount: new Prisma.Decimal(amount.toFixed(2)),
+              method: dto.method,
+              status: PaymentStatus.SUCCESS,
+              transactionReference: dto.transactionReference,
+              notes: dto.notes,
+            },
+          });
+
+          await tx.invoice.update({
+            where: {
+              id: invoice.id,
+            },
+            data: {
+              amountPaid: new Prisma.Decimal(newAmountPaid.toFixed(2)),
+              balanceDue: new Prisma.Decimal(newBalanceDue.toFixed(2)),
+              status: newInvoiceStatus,
+            },
+          });
+
+          return createdPayment;
         },
-      });
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        },
+      );
 
-      if (!currentInvoice) {
-        throw new NotFoundException('Invoice not found');
-      }
-
+      return this.mapPayment(payment);
+    } catch (error) {
+      /*
+       * Prisma uses P2034 when a serializable transaction conflicts with
+       * another concurrent transaction. The request can safely be retried
+       * by the caller using the current invoice balance.
+       */
       if (
-        currentInvoice.status === InvoiceStatus.CANCELLED ||
-        currentInvoice.status === InvoiceStatus.REFUNDED
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2034'
       ) {
         throw new BadRequestException(
-          'Payments cannot be added to this invoice',
+          'The invoice was updated by another payment. Please refresh and try again.',
         );
       }
 
-      const currentBalance = this.roundMoney(Number(currentInvoice.balanceDue));
-
-      if (amount > currentBalance) {
-        throw new BadRequestException(
-          `Payment amount cannot exceed the outstanding balance of ${currentBalance.toFixed(2)}`,
-        );
-      }
-
-      const currentAmountPaid = this.roundMoney(
-        Number(currentInvoice.amountPaid),
-      );
-
-      const newAmountPaid = this.roundMoney(currentAmountPaid + amount);
-
-      const newBalanceDue = this.roundMoney(
-        Number(currentInvoice.total) - newAmountPaid,
-      );
-
-      const newInvoiceStatus =
-        newBalanceDue === 0 ? InvoiceStatus.PAID : InvoiceStatus.PARTIALLY_PAID;
-
-      const createdPayment = await tx.payment.create({
-        data: {
-          invoiceId: currentInvoice.id,
-
-          amount: new Prisma.Decimal(amount.toFixed(2)),
-
-          method: dto.method,
-
-          status: PaymentStatus.SUCCESS,
-
-          transactionReference: dto.transactionReference,
-
-          notes: dto.notes,
-        },
-      });
-
-      await tx.invoice.update({
-        where: {
-          id: currentInvoice.id,
-        },
-
-        data: {
-          amountPaid: new Prisma.Decimal(newAmountPaid.toFixed(2)),
-
-          balanceDue: new Prisma.Decimal(newBalanceDue.toFixed(2)),
-
-          status: newInvoiceStatus,
-        },
-      });
-
-      return createdPayment;
-    });
-
-    return this.mapPayment(payment);
+      throw error;
+    }
   }
 
   // ===========================================================================
@@ -189,14 +183,8 @@ export class PaymentsService {
 
     const where: Prisma.PaymentWhereInput = {
       invoiceId,
-
-      ...(method && {
-        method,
-      }),
-
-      ...(status && {
-        status,
-      }),
+      ...(method && { method }),
+      ...(status && { status }),
     };
 
     const [payments, total] = await this.prisma.$transaction([
@@ -204,12 +192,10 @@ export class PaymentsService {
         where,
         skip,
         take: limit,
-
         orderBy: {
           paidAt: 'desc',
         },
       }),
-
       this.prisma.payment.count({
         where,
       }),
@@ -217,7 +203,6 @@ export class PaymentsService {
 
     return {
       data: payments.map((payment) => this.mapPayment(payment)),
-
       total,
       page,
       limit,
@@ -251,104 +236,135 @@ export class PaymentsService {
   // ===========================================================================
 
   async refund(clinicId: string, id: string): Promise<PaymentResponseDto> {
-    const payment = await this.prisma.payment.findFirst({
-      where: {
-        id,
-        invoice: {
-          clinicId,
+    try {
+      const refundedPayment = await this.prisma.$transaction(
+        async (tx) => {
+          const payment = await tx.payment.findFirst({
+            where: {
+              id,
+              invoice: {
+                clinicId,
+              },
+            },
+          });
+
+          if (!payment) {
+            throw new NotFoundException('Payment not found');
+          }
+
+          if (payment.status === PaymentStatus.REFUNDED) {
+            throw new BadRequestException('Payment has already been refunded');
+          }
+
+          if (payment.status !== PaymentStatus.SUCCESS) {
+            throw new BadRequestException(
+              'Only successful payments can be refunded',
+            );
+          }
+
+          const invoice = await tx.invoice.findUnique({
+            where: {
+              id: payment.invoiceId,
+            },
+          });
+
+          if (!invoice) {
+            throw new NotFoundException('Invoice not found');
+          }
+
+          if (invoice.status === InvoiceStatus.CANCELLED) {
+            throw new BadRequestException(
+              'Payments for a cancelled invoice cannot be refunded',
+            );
+          }
+
+          const paymentAmount = this.roundMoney(Number(payment.amount));
+
+          const currentAmountPaid = this.roundMoney(Number(invoice.amountPaid));
+
+          if (paymentAmount > currentAmountPaid) {
+            throw new BadRequestException(
+              'Payment amount exceeds the invoice amount currently recorded as paid',
+            );
+          }
+
+          const newAmountPaid = this.roundMoney(
+            currentAmountPaid - paymentAmount,
+          );
+
+          const total = this.roundMoney(Number(invoice.total));
+
+          const newBalanceDue = this.roundMoney(
+            Math.max(total - newAmountPaid, 0),
+          );
+
+          /*
+           * Determine whether this refund is a full invoice refund.
+           *
+           * If no successful payments remain after this refund, the invoice
+           * is fully refunded. Otherwise its status reflects the remaining
+           * amount paid.
+           */
+          const remainingSuccessfulPayments = await tx.payment.count({
+            where: {
+              invoiceId: invoice.id,
+              status: PaymentStatus.SUCCESS,
+              id: {
+                not: payment.id,
+              },
+            },
+          });
+
+          let newInvoiceStatus: InvoiceStatus;
+
+          if (remainingSuccessfulPayments === 0) {
+            newInvoiceStatus = InvoiceStatus.REFUNDED;
+          } else if (newBalanceDue === 0) {
+            newInvoiceStatus = InvoiceStatus.PAID;
+          } else {
+            newInvoiceStatus = InvoiceStatus.PARTIALLY_PAID;
+          }
+
+          const updatedPayment = await tx.payment.update({
+            where: {
+              id: payment.id,
+            },
+            data: {
+              status: PaymentStatus.REFUNDED,
+            },
+          });
+
+          await tx.invoice.update({
+            where: {
+              id: invoice.id,
+            },
+            data: {
+              amountPaid: new Prisma.Decimal(newAmountPaid.toFixed(2)),
+              balanceDue: new Prisma.Decimal(newBalanceDue.toFixed(2)),
+              status: newInvoiceStatus,
+            },
+          });
+
+          return updatedPayment;
         },
-      },
-    });
-
-    if (!payment) {
-      throw new NotFoundException('Payment not found');
-    }
-
-    if (payment.status === PaymentStatus.REFUNDED) {
-      throw new BadRequestException('Payment has already been refunded');
-    }
-
-    if (payment.status !== PaymentStatus.SUCCESS) {
-      throw new BadRequestException('Only successful payments can be refunded');
-    }
-
-    const refundedPayment = await this.prisma.$transaction(async (tx) => {
-      const currentPayment = await tx.payment.findUnique({
-        where: {
-          id: payment.id,
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
         },
-      });
+      );
 
-      if (!currentPayment) {
-        throw new NotFoundException('Payment not found');
-      }
-
-      if (currentPayment.status !== PaymentStatus.SUCCESS) {
+      return this.mapPayment(refundedPayment);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2034'
+      ) {
         throw new BadRequestException(
-          'Only successful payments can be refunded',
+          'The payment or invoice was updated by another transaction. Please refresh and try again.',
         );
       }
 
-      const invoice = await tx.invoice.findUnique({
-        where: {
-          id: currentPayment.invoiceId,
-        },
-      });
-
-      if (!invoice) {
-        throw new NotFoundException('Invoice not found');
-      }
-
-      const paymentAmount = Number(currentPayment.amount);
-
-      const currentAmountPaid = Number(invoice.amountPaid);
-
-      const newAmountPaid = this.roundMoney(
-        Math.max(currentAmountPaid - paymentAmount, 0),
-      );
-
-      const total = Number(invoice.total);
-
-      const newBalanceDue = this.roundMoney(total - newAmountPaid);
-
-      let newInvoiceStatus: InvoiceStatus;
-
-      if (newAmountPaid === 0) {
-        newInvoiceStatus = InvoiceStatus.ISSUED;
-      } else if (newBalanceDue > 0) {
-        newInvoiceStatus = InvoiceStatus.PARTIALLY_PAID;
-      } else {
-        newInvoiceStatus = InvoiceStatus.PAID;
-      }
-
-      const updatedPayment = await tx.payment.update({
-        where: {
-          id: currentPayment.id,
-        },
-
-        data: {
-          status: PaymentStatus.REFUNDED,
-        },
-      });
-
-      await tx.invoice.update({
-        where: {
-          id: invoice.id,
-        },
-
-        data: {
-          amountPaid: new Prisma.Decimal(newAmountPaid.toFixed(2)),
-
-          balanceDue: new Prisma.Decimal(newBalanceDue.toFixed(2)),
-
-          status: newInvoiceStatus,
-        },
-      });
-
-      return updatedPayment;
-    });
-
-    return this.mapPayment(refundedPayment);
+      throw error;
+    }
   }
 
   // ===========================================================================
@@ -358,21 +374,13 @@ export class PaymentsService {
   private mapPayment(payment: PaymentRecord): PaymentResponseDto {
     return {
       id: payment.id,
-
       invoiceId: payment.invoiceId,
-
       amount: Number(payment.amount),
-
       method: payment.method,
-
       status: payment.status,
-
       transactionReference: payment.transactionReference,
-
       notes: payment.notes,
-
       paidAt: payment.paidAt,
-
       createdAt: payment.createdAt,
     };
   }

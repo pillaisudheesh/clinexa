@@ -33,4 +33,10 @@ export class PrescriptionResponseDto {
 
   @ApiProperty()
   createdAt!: Date;
+
+  @ApiProperty({
+    example: 'RX-2026-000001',
+    description: 'Human-readable prescription reference number',
+  })
+  prescriptionNumber!: string;
 }
