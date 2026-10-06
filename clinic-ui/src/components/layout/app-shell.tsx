@@ -8,6 +8,7 @@ import {
   LogOut,
   Menu,
   Pill,
+  Package,
   Receipt,
   Search,
   Settings,
@@ -61,10 +62,22 @@ const navigation: NavigationItem[] = [
     permission: "LAB_READ",
   },
   {
+    label: "Medicines",
+    path: "/medicines",
+    icon: Pill,
+    permission: "PHARMACY_READ",
+  },
+  {
     label: "Pharmacy",
     path: "/pharmacy",
     icon: Pill,
     permission: "PHARMACY_READ",
+  },
+  {
+    label: "Inventory",
+    path: "/inventory",
+    icon: Package,
+    permission: "INVENTORY_READ",
   },
   {
     label: "Billing",
@@ -562,6 +575,7 @@ export function AppShell() {
 
         <header
           className="
+          print-hidden
             sticky
             top-0
             z-30
@@ -931,6 +945,7 @@ export function AppShell() {
 
         <nav
           className="
+          print-hidden
             fixed
             inset-x-0
             bottom-0

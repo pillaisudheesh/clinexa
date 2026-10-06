@@ -2,7 +2,12 @@ export type DoctorTitle = "DR" | "PROF" | "MR" | "MS";
 
 export type DoctorGender = "MALE" | "FEMALE" | "OTHER";
 
-export type EmploymentType = "FULL_TIME" | "PART_TIME" | "CONTRACT" | "LOCUM";
+export type EmploymentType =
+  | "FULL_TIME"
+  | "PART_TIME"
+  | "VISITING"
+  | "CONSULTANT"
+  | "RESIDENT";
 
 export interface DoctorReference {
   id: string;
@@ -64,11 +69,44 @@ export interface DoctorQuery {
 
 export interface PaginatedDoctors {
   data: Doctor[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
 
-  meta: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
+export interface CreateDoctorRequest {
+  title: DoctorTitle;
+
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+
+  gender: DoctorGender;
+  dateOfBirth?: string;
+
+  email?: string;
+  phone?: string;
+
+  departmentId: string;
+  primarySpecialtyId: string;
+
+  additionalSpecialtyIds?: string[];
+  qualificationIds?: string[];
+  languageIds?: string[];
+
+  registrationCouncilId?: string;
+  registrationNumber?: string;
+
+  yearsOfExperience?: number;
+
+  employmentType: EmploymentType;
+
+  biography?: string;
+}
+
+export type UpdateDoctorRequest = Partial<CreateDoctorRequest>;
+
+export interface UpdateDoctorStatusRequest {
+  isActive: boolean;
 }

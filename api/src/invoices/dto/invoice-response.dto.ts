@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-import { InvoiceStatus } from '@prisma/client';
+import { InvoiceStatus, InvoiceType } from '@prisma/client';
 
 export class InvoiceItemResponseDto {
   @ApiProperty({
@@ -62,6 +62,12 @@ export class InvoiceResponseDto {
     format: 'uuid',
   })
   appointmentId!: string;
+
+  @ApiProperty({
+    enum: InvoiceType,
+    example: InvoiceType.CONSULTATION,
+  })
+  type!: InvoiceType;
 
   @ApiProperty({
     enum: InvoiceStatus,

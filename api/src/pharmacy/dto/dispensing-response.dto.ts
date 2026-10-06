@@ -39,6 +39,9 @@ export class DispensingResponseDto {
   @ApiPropertyOptional()
   invoiceId!: string | null;
 
+  @ApiPropertyOptional()
+  invoiceNumber!: string | null;
+
   @ApiProperty()
   status!: string;
 

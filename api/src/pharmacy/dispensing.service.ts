@@ -8,6 +8,8 @@ import {
 import {
   InventoryTransactionType,
   PharmacyDispensingStatus,
+  InvoiceType,
+  InvoiceStatus,
   Prisma,
 } from '@prisma/client';
 
@@ -48,6 +50,12 @@ export class DispensingService {
         },
         include: {
           medicine: true,
+          medicalRecord: {
+            select: {
+              appointmentId: true,
+              patientId: true,
+            },
+          },
         },
       });
 
@@ -97,7 +105,63 @@ export class DispensingService {
         );
       }
 
-      const invoiceId = dto.invoiceId ?? existing?.invoiceId;
+      let invoiceId = dto.invoiceId ?? existing?.invoiceId;
+
+      if (!invoiceId) {
+        const invoiceNumber = await this.generateInvoiceNumber(tx, clinicId);
+
+        const invoice = await tx.invoice.create({
+          data: {
+            clinicId,
+            patientId: prescription.medicalRecord.patientId,
+            appointmentId: prescription.medicalRecord.appointmentId,
+            invoiceNumber,
+            type: InvoiceType.PHARMACY,
+            status: InvoiceStatus.DRAFT,
+            subtotal: 0,
+            discount: 0,
+            tax: 0,
+            total: 0,
+            amountPaid: 0,
+            balanceDue: 0,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        invoiceId = invoice.id;
+      }
+
+      let pharmacyInvoiceId = invoiceId;
+
+      if (!pharmacyInvoiceId) {
+        const invoiceNumber = await this.generateInvoiceNumber(tx, clinicId);
+
+        const pharmacyInvoice = await tx.invoice.create({
+          data: {
+            clinicId,
+            patientId: prescription.medicalRecord.appointmentId
+              ? prescription.medicalRecord.appointmentId
+              : '',
+            appointmentId: prescription.medicalRecord.appointmentId,
+            invoiceNumber,
+            type: InvoiceType.PHARMACY,
+            status: InvoiceStatus.DRAFT,
+            subtotal: 0,
+            discount: 0,
+            tax: 0,
+            total: 0,
+            amountPaid: 0,
+            balanceDue: 0,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        pharmacyInvoiceId = pharmacyInvoice.id;
+      }
 
       // -----------------------------------------------------------------------
       // 3. Parse prescription quantity
@@ -331,6 +395,11 @@ export class DispensingService {
         },
 
         include: {
+          invoice: {
+            select: {
+              invoiceNumber: true,
+            },
+          },
           items: {
             include: {
               medicine: true,
@@ -438,6 +507,7 @@ export class DispensingService {
       select: {
         discount: true,
         tax: true,
+        amountPaid: true,
       },
     });
 
@@ -450,6 +520,7 @@ export class DispensingService {
     const tax = invoice.tax ?? new Prisma.Decimal(0);
 
     const total = subtotal.sub(discount).add(tax);
+    const balanceDue = total.sub(invoice.amountPaid);
 
     await tx.invoice.update({
       where: {
@@ -458,6 +529,7 @@ export class DispensingService {
       data: {
         subtotal,
         total,
+        balanceDue,
       },
     });
   }
@@ -477,6 +549,11 @@ export class DispensingService {
       },
 
       include: {
+        invoice: {
+          select: {
+            invoiceNumber: true,
+          },
+        },
         items: {
           include: {
             medicine: true,
@@ -691,6 +768,11 @@ export class DispensingService {
           id: dispensing.id,
         },
         include: {
+          invoice: {
+            select: {
+              invoiceNumber: true,
+            },
+          },
           items: {
             include: {
               medicine: true,
@@ -715,6 +797,11 @@ export class DispensingService {
   private mapDispensing(
     dispensing: Prisma.PharmacyDispensingGetPayload<{
       include: {
+        invoice: {
+          select: {
+            invoiceNumber: true;
+          };
+        };
         items: {
           include: {
             medicine: true;
@@ -750,6 +837,7 @@ export class DispensingService {
       prescriptionId: dispensing.prescriptionId,
 
       invoiceId: dispensing.invoiceId,
+      invoiceNumber: dispensing.invoice?.invoiceNumber ?? null,
 
       status: dispensing.status,
 
@@ -757,5 +845,37 @@ export class DispensingService {
 
       items,
     };
+  }
+
+  private async generateInvoiceNumber(
+    tx: Prisma.TransactionClient,
+    clinicId: string,
+  ): Promise<string> {
+    const clinic = await tx.clinic.findUnique({
+      where: {
+        id: clinicId,
+      },
+      select: {
+        code: true,
+      },
+    });
+
+    if (!clinic) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    const year = new Date().getFullYear();
+
+    const count = await tx.invoice.count({
+      where: {
+        clinicId,
+        createdAt: {
+          gte: new Date(`${year}-01-01T00:00:00.000Z`),
+          lt: new Date(`${year + 1}-01-01T00:00:00.000Z`),
+        },
+      },
+    });
+
+    return `INV-${clinic.code}-${year}-${String(count + 1).padStart(6, '0')}`;
   }
 }

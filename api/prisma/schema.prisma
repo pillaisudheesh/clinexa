@@ -125,6 +125,13 @@ enum InventoryTransactionType {
   EXPIRED
 }
 
+enum InvoiceType {
+  CONSULTATION
+  LABORATORY
+  PHARMACY
+  OTHER
+}
+
 model Clinic {
   id String @id @default(uuid())
 
@@ -672,7 +679,7 @@ model Appointment {
   updatedAt DateTime @updatedAt
 
   medicalRecord MedicalRecord?
-  invoice       Invoice?
+  invoices Invoice[]
   labOrders     LabOrder[]
 
   @@unique([clinicId, appointmentNumber])
@@ -780,7 +787,7 @@ model Invoice {
   patientId String
   patient   Patient @relation(fields: [patientId], references: [id], onDelete: Restrict)
 
-  appointmentId String      @unique
+  appointmentId String
   appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
 
   status InvoiceStatus @default(DRAFT)
@@ -804,12 +811,15 @@ model Invoice {
   items               InvoiceItem[]
   payments            Payment[]
   pharmacyDispensings PharmacyDispensing[]
+  type InvoiceType @default(CONSULTATION)
 
   @@unique([clinicId, invoiceNumber])
   @@index([clinicId])
   @@index([patientId])
   @@index([status])
   @@index([createdAt])
+  @@index([appointmentId])
+  @@index([type])
 }
 
 model InvoiceItem {

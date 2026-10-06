@@ -162,3 +162,12 @@ button {
 a {
   -webkit-tap-highlight-color: transparent;
 }
+
+@media print {
+  .print-hidden {
+    display: none !important;
+  }
+  .print-compact {
+    zoom: 0.9;
+  }
+}

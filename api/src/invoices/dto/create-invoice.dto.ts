@@ -1,3 +1,4 @@
+import { InvoiceType } from '@prisma/client';
 import { Type } from 'class-transformer';
 
 import {
@@ -9,6 +10,7 @@ import {
   IsUUID,
   Min,
   ValidateNested,
+  IsEnum,
 } from 'class-validator';
 
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -83,4 +85,8 @@ export class CreateInvoiceDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiProperty({ enum: InvoiceType })
+  @IsEnum(InvoiceType)
+  type!: InvoiceType;
 }

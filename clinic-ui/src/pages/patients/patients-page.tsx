@@ -20,6 +20,7 @@ import { useAuth } from "@/auth/auth-context";
 import { patientService } from "@/services/patient-service";
 
 import type { Patient, PaginatedPatients } from "@/types/patient";
+import { Loader2 } from "lucide-react";
 
 const PAGE_SIZE = 10;
 
@@ -868,16 +869,7 @@ export function PatientsPage() {
                 text-slate-400
               "
             >
-              <span
-                className="
-                  size-3
-                  animate-spin
-                  rounded-full
-                  border-2
-                  border-slate-200
-                  border-t-teal-500
-                "
-              />
+              <Loader2 className="size-3.5 animate-spin text-teal-500" />
               Loading
             </div>
           )}

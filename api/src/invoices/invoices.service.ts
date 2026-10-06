@@ -50,8 +50,11 @@ export class InvoicesService {
       select: {
         id: true,
         patientId: true,
-        invoice: {
-          select: { id: true },
+        invoices: {
+          select: {
+            id: true,
+            type: true,
+          },
         },
       },
     });
@@ -60,9 +63,9 @@ export class InvoicesService {
       throw new NotFoundException('Appointment not found');
     }
 
-    if (appointment.invoice) {
+    if (appointment.invoices.some((invoice) => invoice.type === dto.type)) {
       throw new ConflictException(
-        'An invoice already exists for this appointment',
+        'An invoice of this type already exists for this appointment',
       );
     }
 
@@ -95,6 +98,7 @@ export class InvoicesService {
           clinicId,
           patientId: appointment.patientId,
           appointmentId: appointment.id,
+          type: dto.type,
           status: InvoiceStatus.DRAFT,
           subtotal: this.decimal(subtotal),
           discount: this.decimal(discount),
@@ -725,6 +729,7 @@ export class InvoicesService {
       patientId: invoice.patientId,
       appointmentId: invoice.appointmentId,
       status: invoice.status,
+      type: invoice.type,
       subtotal: Number(invoice.subtotal),
       discount: Number(invoice.discount),
       tax: Number(invoice.tax),

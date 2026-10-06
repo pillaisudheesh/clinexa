@@ -11,10 +11,10 @@ import { PrismaService } from '../prisma/prisma.service';
 
 import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
 
-import { CreateMedicineDto } from './dto/create-medicine.dto';
+import { CreatePharmacyMedicineDto } from './dto/create-medicine.dto';
 import { MedicineQueryDto } from './dto/medicine-query.dto';
-import { MedicineResponseDto } from './dto/medicine-response.dto';
-import { UpdateMedicineDto } from './dto/update-medicine.dto';
+import { PharmacyMedicineResponseDto } from './dto/medicine-response.dto';
+import { UpdatePharmacyMedicineDto } from './dto/update-medicine.dto';
 
 @Injectable()
 export class PharmacyService {
@@ -26,8 +26,8 @@ export class PharmacyService {
 
   async create(
     clinicId: string,
-    dto: CreateMedicineDto,
-  ): Promise<MedicineResponseDto> {
+    dto: CreatePharmacyMedicineDto,
+  ): Promise<PharmacyMedicineResponseDto> {
     const existing = await this.prisma.medicine.findFirst({
       where: {
         clinicId,
@@ -70,7 +70,7 @@ export class PharmacyService {
   async findAll(
     clinicId: string,
     query: MedicineQueryDto,
-  ): Promise<PaginatedResponseDto<MedicineResponseDto>> {
+  ): Promise<PaginatedResponseDto<PharmacyMedicineResponseDto>> {
     const { page = 1, limit = 10, search, category, isActive } = query;
 
     const skip = (page - 1) * limit;
@@ -138,7 +138,10 @@ export class PharmacyService {
   // GET BY ID
   // ===========================================================================
 
-  async findOne(clinicId: string, id: string): Promise<MedicineResponseDto> {
+  async findOne(
+    clinicId: string,
+    id: string,
+  ): Promise<PharmacyMedicineResponseDto> {
     const medicine = await this.prisma.medicine.findFirst({
       where: {
         id,
@@ -160,8 +163,8 @@ export class PharmacyService {
   async update(
     clinicId: string,
     id: string,
-    dto: UpdateMedicineDto,
-  ): Promise<MedicineResponseDto> {
+    dto: UpdatePharmacyMedicineDto,
+  ): Promise<PharmacyMedicineResponseDto> {
     const medicine = await this.prisma.medicine.findFirst({
       where: {
         id,
@@ -249,7 +252,7 @@ export class PharmacyService {
     clinicId: string,
     id: string,
     isActive: boolean,
-  ): Promise<MedicineResponseDto> {
+  ): Promise<PharmacyMedicineResponseDto> {
     const medicine = await this.prisma.medicine.findFirst({
       where: {
         id,
@@ -285,7 +288,7 @@ export class PharmacyService {
 
   private mapMedicine(
     medicine: Prisma.MedicineGetPayload<true>,
-  ): MedicineResponseDto {
+  ): PharmacyMedicineResponseDto {
     return {
       id: medicine.id,
       clinicId: medicine.clinicId,

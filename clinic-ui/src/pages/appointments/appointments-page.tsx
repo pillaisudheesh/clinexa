@@ -12,18 +12,13 @@ import {
 } from "lucide-react";
 
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { appointmentService } from "@/services/appointment-service";
 import { doctorService } from "@/services/doctor-service";
 import { patientService } from "@/services/patient-service";
-import { medicalRecordService } from "@/services/medical-record-service";
 import { useAuth } from "@/auth/auth-context";
-
-import type {
-  CreateMedicalRecordRequest,
-  MedicalRecord,
-  UpdateMedicalRecordRequest,
-} from "@/types/medical-record";
+import { PageLoader } from "@/components/ui/page-loader";
 
 import type {
   Appointment,
@@ -33,17 +28,9 @@ import type {
 
 import type { Doctor } from "@/types/doctor";
 import type { Patient } from "@/types/patient";
-import { diagnosisService } from "@/services/diagnosis-service";
-
-import type {
-  CreateDiagnosisRequest,
-  Diagnosis,
-  UpdateDiagnosisRequest,
-} from "@/types/diagnosis";
 
 import { AppointmentRegistrationModal } from "./appointment-registration-modal";
 import { AppointmentDetailsModal } from "./appointment-details-modal";
-import { ConsultationModal } from "./consultation-modal";
 
 const PAGE_SIZE = 10;
 
@@ -539,8 +526,8 @@ function AppointmentMobileCard({
 
 export function AppointmentsPage() {
   const { user, hasPermission } = useAuth();
+  const navigate = useNavigate();
 
-  console.log("User permissions:", user?.permissions);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
 
   const [loading, setLoading] = useState(true);
@@ -586,26 +573,6 @@ export function AppointmentsPage() {
   const [checkingIn, setCheckingIn] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [startingConsultation, setStartingConsultation] = useState(false);
-  const [consultationOpen, setConsultationOpen] = useState(false);
-
-  const [consultationLoading, setConsultationLoading] = useState(false);
-
-  const [medicalRecord, setMedicalRecord] = useState<MedicalRecord | null>(
-    null,
-  );
-
-  const [medicalRecordSaving, setMedicalRecordSaving] = useState(false);
-
-  const [completing, setCompleting] = useState(false);
-  const [diagnoses, setDiagnoses] = useState<Diagnosis[]>([]);
-
-  const [diagnosesLoading, setDiagnosesLoading] = useState(false);
-
-  const [diagnosisSaving, setDiagnosisSaving] = useState(false);
-
-  const [diagnosisDeleting, setDiagnosisDeleting] = useState<string | null>(
-    null,
-  );
 
   const canReadAppointments = hasPermission("APPOINTMENT_READ");
 
@@ -615,19 +582,7 @@ export function AppointmentsPage() {
 
   const canCancelAppointments = hasPermission("APPOINTMENT_CANCEL");
 
-  const canCreateMedicalRecords = hasPermission("MEDICAL_RECORD_CREATE");
-
   const canReadMedicalRecords = hasPermission("MEDICAL_RECORD_READ");
-
-  const canUpdateMedicalRecords = hasPermission("MEDICAL_RECORD_UPDATE");
-
-  const canReadDiagnoses = hasPermission("DIAGNOSIS_READ");
-
-  const canCreateDiagnoses = hasPermission("DIAGNOSIS_CREATE");
-
-  const canUpdateDiagnoses = hasPermission("DIAGNOSIS_UPDATE");
-
-  const canDeleteDiagnoses = hasPermission("DIAGNOSIS_DELETE");
 
   const canConfirmAppointment =
     selectedAppointment?.status === "SCHEDULED" && canUpdateAppointments;
@@ -643,22 +598,8 @@ export function AppointmentsPage() {
       selectedAppointment?.status ?? "",
     ) && canCancelAppointments;
 
-  const canCompleteAppointment =
-    selectedAppointment?.status === "IN_CONSULTATION" &&
-    canUpdateAppointments &&
-    (canCreateMedicalRecords || canUpdateMedicalRecords);
-
   const canViewCompletedConsultation =
     selectedAppointment?.status === "COMPLETED" && canReadMedicalRecords;
-
-  console.log("Diagnosis debug:", {
-    medicalRecord,
-    canReadDiagnoses,
-    canCreateDiagnoses,
-    canUpdateDiagnoses,
-    canDeleteDiagnoses,
-    diagnoses,
-  });
 
   const loadPatients = useCallback(async () => {
     try {
@@ -860,269 +801,33 @@ export function AppointmentsPage() {
     try {
       setStartingConsultation(true);
 
-      const updated = await appointmentService.startConsultation(
-        selectedAppointment.id,
-      );
+      await appointmentService.startConsultation(selectedAppointment.id);
 
-      setSelectedAppointment(updated);
-
-      await loadAppointments();
-
-      setConsultationOpen(true);
-
-      setConsultationLoading(true);
-
-      const response = await medicalRecordService.getMedicalRecords(updated.id);
-
-      if (response.data?.[0]) {
-        const record = response.data[0];
-
-        setMedicalRecord(record);
-
-        await loadDiagnoses(record.id);
-      } else {
-        setMedicalRecord(null);
-        setDiagnoses([]);
-      }
+      closeAppointmentDetails();
+      navigate(`/appointments/${selectedAppointment.id}/consultation`);
     } catch (error) {
       console.error("Unable to start consultation.", error);
     } finally {
       setStartingConsultation(false);
-      setConsultationLoading(false);
     }
   };
 
-  const openConsultation = async () => {
+  const handleContinueConsultation = () => {
     if (!selectedAppointment) {
       return;
     }
 
-    try {
-      setConsultationOpen(true);
-      setConsultationLoading(true);
-
-      const response = await medicalRecordService.getMedicalRecords(
-        selectedAppointment.id,
-      );
-
-      setMedicalRecord(response.data?.[0] ?? null);
-    } catch (error) {
-      console.error("Unable to load medical record.", error);
-
-      setMedicalRecord(null);
-    } finally {
-      setConsultationLoading(false);
-    }
+    closeAppointmentDetails();
+    navigate(`/appointments/${selectedAppointment.id}/consultation`);
   };
 
-  const handleSaveMedicalRecord = async (
-    data: CreateMedicalRecordRequest | UpdateMedicalRecordRequest,
-  ) => {
+  const handleViewConsultation = () => {
     if (!selectedAppointment) {
       return;
     }
 
-    try {
-      setMedicalRecordSaving(true);
-
-      if (medicalRecord) {
-        const updated = await medicalRecordService.updateMedicalRecord(
-          medicalRecord.id,
-          data as UpdateMedicalRecordRequest,
-        );
-
-        setMedicalRecord(updated);
-
-        return;
-      }
-
-      const created = await medicalRecordService.createMedicalRecord(
-        data as CreateMedicalRecordRequest,
-      );
-
-      setMedicalRecord(created);
-    } catch (error) {
-      console.error("Unable to save medical record.", error);
-    } finally {
-      setMedicalRecordSaving(false);
-    }
-  };
-
-  const handleCompleteAppointment = async () => {
-    if (!selectedAppointment || !medicalRecord) {
-      return;
-    }
-
-    try {
-      setCompleting(true);
-
-      const updated = await appointmentService.completeAppointment(
-        selectedAppointment.id,
-      );
-
-      setSelectedAppointment(updated);
-
-      setConsultationOpen(false);
-
-      await loadAppointments();
-    } catch (error) {
-      console.error("Unable to complete consultation.", error);
-    } finally {
-      setCompleting(false);
-    }
-  };
-  const handleCloseConsultation = () => {
-    if (medicalRecordSaving || completing) {
-      return;
-    }
-
-    setConsultationOpen(false);
-  };
-  const handleContinueConsultation = async () => {
-    if (!selectedAppointment) {
-      return;
-    }
-
-    setConsultationOpen(true);
-    setConsultationLoading(true);
-
-    try {
-      const response = await medicalRecordService.getMedicalRecords(
-        selectedAppointment.id,
-      );
-
-      if (response.data?.[0]) {
-        const record = response.data[0];
-
-        setMedicalRecord(record);
-
-        await loadDiagnoses(record.id);
-      } else {
-        setMedicalRecord(null);
-        setDiagnoses([]);
-      }
-    } catch (error) {
-      console.error("Unable to load consultation.", error);
-
-      setMedicalRecord(null);
-    } finally {
-      setConsultationLoading(false);
-    }
-  };
-
-  const handleViewConsultation = async () => {
-    if (!selectedAppointment) {
-      return;
-    }
-
-    try {
-      setConsultationOpen(true);
-      setConsultationLoading(true);
-
-      const response = await medicalRecordService.getMedicalRecords(
-        selectedAppointment.id,
-      );
-
-      if (response.data?.[0]) {
-        const record = response.data[0];
-
-        setMedicalRecord(record);
-
-        await loadDiagnoses(record.id);
-      } else {
-        setMedicalRecord(null);
-        setDiagnoses([]);
-      }
-    } catch (error) {
-      console.error("Unable to load completed consultation.", error);
-
-      setMedicalRecord(null);
-    } finally {
-      setConsultationLoading(false);
-    }
-  };
-
-  const loadDiagnoses = async (medicalRecordId: string) => {
-    if (!canReadDiagnoses) {
-      setDiagnoses([]);
-      return;
-    }
-
-    try {
-      setDiagnosesLoading(true);
-
-      const records =
-        await diagnosisService.getByMedicalRecord(medicalRecordId);
-
-      setDiagnoses(records);
-    } catch (error) {
-      console.error("Unable to load diagnoses.", error);
-
-      setDiagnoses([]);
-    } finally {
-      setDiagnosesLoading(false);
-    }
-  };
-
-  const handleCreateDiagnosis = async (data: CreateDiagnosisRequest) => {
-    if (!canCreateDiagnoses) {
-      return;
-    }
-
-    try {
-      setDiagnosisSaving(true);
-
-      const created = await diagnosisService.create(data);
-
-      setDiagnoses((current) => [created, ...current]);
-    } catch (error) {
-      console.error("Unable to create diagnosis.", error);
-    } finally {
-      setDiagnosisSaving(false);
-    }
-  };
-
-  const handleUpdateDiagnosis = async (
-    id: string,
-    data: UpdateDiagnosisRequest,
-  ) => {
-    if (!canUpdateDiagnoses) {
-      return;
-    }
-
-    try {
-      setDiagnosisSaving(true);
-
-      const updated = await diagnosisService.update(id, data);
-
-      setDiagnoses((current) =>
-        current.map((diagnosis) => (diagnosis.id === id ? updated : diagnosis)),
-      );
-    } catch (error) {
-      console.error("Unable to update diagnosis.", error);
-    } finally {
-      setDiagnosisSaving(false);
-    }
-  };
-
-  const handleDeleteDiagnosis = async (id: string) => {
-    if (!canDeleteDiagnoses) {
-      return;
-    }
-
-    try {
-      setDiagnosisDeleting(id);
-
-      await diagnosisService.remove(id);
-
-      setDiagnoses((current) =>
-        current.filter((diagnosis) => diagnosis.id !== id),
-      );
-    } catch (error) {
-      console.error("Unable to delete diagnosis.", error);
-    } finally {
-      setDiagnosisDeleting(null);
-    }
+    closeAppointmentDetails();
+    navigate(`/appointments/${selectedAppointment.id}/consultation`);
   };
 
   return (
@@ -1430,12 +1135,10 @@ export function AppointmentsPage() {
 
         {/* Loading */}
         {loading ? (
-          <div className="flex min-h-[360px] items-center justify-center">
-            <div className="flex items-center gap-3 text-sm text-slate-400">
-              <div className="size-4 animate-spin rounded-full border-2 border-slate-200 border-t-teal-500" />
-              Loading appointments...
-            </div>
-          </div>
+          <PageLoader
+            message="Loading appointments..."
+            className="min-h-[360px]"
+          />
         ) : error ? (
           <div className="flex min-h-[360px] flex-col items-center justify-center px-5 text-center">
             <p className="text-sm font-medium text-slate-600">
@@ -1649,32 +1352,6 @@ export function AppointmentsPage() {
         onViewConsultation={handleViewConsultation}
       />
 
-      <ConsultationModal
-        open={consultationOpen}
-        appointment={selectedAppointment}
-        medicalRecord={medicalRecord}
-        loading={consultationLoading}
-        saving={medicalRecordSaving}
-        completing={completing}
-        readOnly={selectedAppointment?.status === "COMPLETED"}
-        canCreateMedicalRecord={canCreateMedicalRecords}
-        canUpdateMedicalRecord={canUpdateMedicalRecords}
-        canCompleteAppointment={canCompleteAppointment}
-        diagnoses={diagnoses}
-        diagnosesLoading={diagnosesLoading}
-        diagnosisSaving={diagnosisSaving}
-        diagnosisDeleting={diagnosisDeleting}
-        canReadDiagnoses={canReadDiagnoses}
-        canCreateDiagnoses={canCreateDiagnoses}
-        canUpdateDiagnoses={canUpdateDiagnoses}
-        canDeleteDiagnoses={canDeleteDiagnoses}
-        onCreateDiagnosis={handleCreateDiagnosis}
-        onUpdateDiagnosis={handleUpdateDiagnosis}
-        onDeleteDiagnosis={handleDeleteDiagnosis}
-        onClose={handleCloseConsultation}
-        onSave={handleSaveMedicalRecord}
-        onComplete={handleCompleteAppointment}
-      />
       {showCancelDialog && (
         <div
           className="

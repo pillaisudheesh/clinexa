@@ -34,9 +34,8 @@ export class ConsultationSummaryResponseDto {
   })
   labOrders!: LabOrderResponseDto[];
 
-  @ApiPropertyOptional({
-    type: InvoiceResponseDto,
-    nullable: true,
+  @ApiProperty({
+    type: [InvoiceResponseDto],
   })
-  invoice!: InvoiceResponseDto | null;
+  invoices!: InvoiceResponseDto[];
 }

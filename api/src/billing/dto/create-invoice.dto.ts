@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { InvoiceType } from '@prisma/client';
 
 import {
   IsArray,
@@ -8,6 +9,7 @@ import {
   IsUUID,
   Min,
   ValidateNested,
+  IsEnum,
 } from 'class-validator';
 
 import { Type } from 'class-transformer';
@@ -71,4 +73,8 @@ export class CreateInvoiceDto {
   @ValidateNested({ each: true })
   @Type(() => CreateInvoiceItemDto)
   items!: CreateInvoiceItemDto[];
+
+  @ApiProperty({ enum: InvoiceType })
+  @IsEnum(InvoiceType)
+  type!: InvoiceType;
 }

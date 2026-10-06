@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import { Prisma } from '@prisma/client';
+import { Prisma, InvoiceType } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -44,12 +44,10 @@ export class BillingService {
       );
     }
 
-    const existingInvoice = await this.prisma.invoice.findUnique({
+    const existingInvoice = await this.prisma.invoice.findFirst({
       where: {
-        appointmentId: dto.appointmentId,
-      },
-      select: {
-        id: true,
+        appointmentId: appointment.id,
+        type: InvoiceType.CONSULTATION,
       },
     });
 
@@ -96,6 +94,7 @@ export class BillingService {
         balanceDue: total,
 
         notes: dto.notes,
+        type: dto.type,
 
         items: {
           create: dto.items.map((item) => ({
@@ -283,6 +282,7 @@ export class BillingService {
         patient: {
           select: {
             id: true,
+            patientNumber: true,
             firstName: true,
             middleName: true,
             lastName: true,

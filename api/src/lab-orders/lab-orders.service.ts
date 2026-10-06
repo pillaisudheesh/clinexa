@@ -1,11 +1,16 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 
-import { LabOrderItemStatus, LabOrderStatus, Prisma } from '@prisma/client';
+import {
+  InvoiceStatus,
+  InvoiceType,
+  LabOrderItemStatus,
+  LabOrderStatus,
+  Prisma,
+} from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -117,27 +122,27 @@ export class LabOrdersService {
         throw new NotFoundException('Appointment not found');
       }
 
-      // -------------------------------------------------------------------
-      // Prevent duplicate active lab orders
-      // -------------------------------------------------------------------
+      // // -------------------------------------------------------------------
+      // // Prevent duplicate active lab orders
+      // // -------------------------------------------------------------------
 
-      const existingOrder = await tx.labOrder.findFirst({
-        where: {
-          appointmentId: appointment.id,
-          status: {
-            not: LabOrderStatus.CANCELLED,
-          },
-        },
-        select: {
-          id: true,
-        },
-      });
+      // const existingOrder = await tx.labOrder.findFirst({
+      //   where: {
+      //     appointmentId: appointment.id,
+      //     status: {
+      //       not: LabOrderStatus.CANCELLED,
+      //     },
+      //   },
+      //   select: {
+      //     id: true,
+      //   },
+      // });
 
-      if (existingOrder) {
-        throw new ConflictException(
-          'A laboratory order already exists for this appointment',
-        );
-      }
+      // if (existingOrder) {
+      //   throw new ConflictException(
+      //     'A laboratory order already exists for this appointment',
+      //   );
+      // }
 
       // -------------------------------------------------------------------
       // Validate requested lab tests
@@ -181,7 +186,7 @@ export class LabOrdersService {
       // Create lab order
       // -------------------------------------------------------------------
 
-      return tx.labOrder.create({
+      const labOrder = await tx.labOrder.create({
         data: {
           clinicId,
           patientId: appointment.patientId,
@@ -205,6 +210,7 @@ export class LabOrdersService {
 
         include: {
           ...appointmentInclude,
+
           labOrderItems: {
             include: {
               labTest: true,
@@ -213,6 +219,59 @@ export class LabOrdersService {
           },
         },
       });
+      // const existingLaboratoryInvoice = await tx.invoice.findFirst({
+      //   where: {
+      //     appointmentId: appointment.id,
+      //     type: InvoiceType.LABORATORY,
+      //   },
+      //   select: {
+      //     id: true,
+      //   },
+      // });
+
+      // if (existingLaboratoryInvoice) {
+      //   throw new ConflictException(
+      //     'A laboratory invoice already exists for this appointment',
+      //   );
+      // }
+
+      const subtotal = labTests.reduce(
+        (sum, labTest) => sum.add(labTest.price),
+        new Prisma.Decimal('0.00'),
+      );
+
+      const invoiceNumber = await this.generateInvoiceNumber(tx, clinicId);
+
+      await tx.invoice.create({
+        data: {
+          invoiceNumber,
+          clinicId: appointment.clinicId,
+          patientId: appointment.patientId,
+          appointmentId: appointment.id,
+
+          type: InvoiceType.LABORATORY,
+          status: InvoiceStatus.DRAFT,
+
+          subtotal,
+          discount: new Prisma.Decimal('0.00'),
+          tax: new Prisma.Decimal('0.00'),
+          total: subtotal,
+
+          amountPaid: new Prisma.Decimal('0.00'),
+          balanceDue: subtotal,
+
+          items: {
+            create: labTests.map((labTest) => ({
+              description: labTest.name,
+              quantity: new Prisma.Decimal('1.00'),
+              unitPrice: labTest.price,
+              amount: labTest.price,
+            })),
+          },
+        },
+      });
+
+      return labOrder;
     });
 
     return this.mapLabOrder(labOrder);
@@ -791,5 +850,37 @@ export class LabOrdersService {
 
       updatedAt: order.updatedAt,
     };
+  }
+
+  // ===========================================================================
+  // INVOICE NUMBER
+  // ===========================================================================
+
+  private async generateInvoiceNumber(
+    tx: Prisma.TransactionClient,
+    clinicId: string,
+  ): Promise<string> {
+    const clinic = await tx.clinic.findUnique({
+      where: { id: clinicId },
+      select: { code: true },
+    });
+
+    if (!clinic) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    const year = new Date().getFullYear();
+
+    const count = await tx.invoice.count({
+      where: {
+        clinicId,
+        createdAt: {
+          gte: new Date(`${year}-01-01T00:00:00.000Z`),
+          lt: new Date(`${year + 1}-01-01T00:00:00.000Z`),
+        },
+      },
+    });
+
+    return `INV-${clinic.code}-${year}-${String(count + 1).padStart(6, '0')}`;
   }
 }

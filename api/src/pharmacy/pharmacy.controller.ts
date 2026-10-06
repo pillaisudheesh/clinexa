@@ -28,10 +28,10 @@ import { PermissionCodes } from '../auth/constants/permission-codes';
 import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
 
 import { PharmacyService } from './pharmacy.service';
-import { CreateMedicineDto } from './dto/create-medicine.dto';
+import { CreatePharmacyMedicineDto } from './dto/create-medicine.dto';
 import { MedicineQueryDto } from './dto/medicine-query.dto';
-import { MedicineResponseDto } from './dto/medicine-response.dto';
-import { UpdateMedicineDto } from './dto/update-medicine.dto';
+import { PharmacyMedicineResponseDto } from './dto/medicine-response.dto';
+import { UpdatePharmacyMedicineDto } from './dto/update-medicine.dto';
 import { UpdateMedicineStatusDto } from './dto/update-medicine-status.dto';
 
 interface AuthenticatedRequest extends Request {
@@ -59,12 +59,12 @@ export class PharmacyController {
   })
   @ApiResponse({
     status: 201,
-    type: MedicineResponseDto,
+    type: PharmacyMedicineResponseDto,
   })
   create(
     @Req() req: AuthenticatedRequest,
-    @Body() dto: CreateMedicineDto,
-  ): Promise<MedicineResponseDto> {
+    @Body() dto: CreatePharmacyMedicineDto,
+  ): Promise<PharmacyMedicineResponseDto> {
     return this.pharmacyService.create(req.user.clinicId, dto);
   }
 
@@ -80,7 +80,7 @@ export class PharmacyController {
   findAll(
     @Req() req: AuthenticatedRequest,
     @Query() query: MedicineQueryDto,
-  ): Promise<PaginatedResponseDto<MedicineResponseDto>> {
+  ): Promise<PaginatedResponseDto<PharmacyMedicineResponseDto>> {
     return this.pharmacyService.findAll(req.user.clinicId, query);
   }
 
@@ -95,13 +95,13 @@ export class PharmacyController {
   })
   @ApiResponse({
     status: 200,
-    type: MedicineResponseDto,
+    type: PharmacyMedicineResponseDto,
   })
   findOne(
     @Req() req: AuthenticatedRequest,
     @Param('id', new ParseUUIDPipe())
     id: string,
-  ): Promise<MedicineResponseDto> {
+  ): Promise<PharmacyMedicineResponseDto> {
     return this.pharmacyService.findOne(req.user.clinicId, id);
   }
 
@@ -116,14 +116,14 @@ export class PharmacyController {
   })
   @ApiResponse({
     status: 200,
-    type: MedicineResponseDto,
+    type: PharmacyMedicineResponseDto,
   })
   update(
     @Req() req: AuthenticatedRequest,
     @Param('id', new ParseUUIDPipe())
     id: string,
-    @Body() dto: UpdateMedicineDto,
-  ): Promise<MedicineResponseDto> {
+    @Body() dto: UpdatePharmacyMedicineDto,
+  ): Promise<PharmacyMedicineResponseDto> {
     return this.pharmacyService.update(req.user.clinicId, id, dto);
   }
 
@@ -138,14 +138,14 @@ export class PharmacyController {
   })
   @ApiResponse({
     status: 200,
-    type: MedicineResponseDto,
+    type: PharmacyMedicineResponseDto,
   })
   updateStatus(
     @Req() req: AuthenticatedRequest,
     @Param('id', new ParseUUIDPipe())
     id: string,
     @Body() dto: UpdateMedicineStatusDto,
-  ): Promise<MedicineResponseDto> {
+  ): Promise<PharmacyMedicineResponseDto> {
     return this.pharmacyService.updateStatus(
       req.user.clinicId,
       id,

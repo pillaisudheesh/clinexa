@@ -10,6 +10,16 @@ import { PatientsPage } from "@/pages/patients/patients-page";
 import { PatientRegistrationPage } from "@/pages/patients/patient-registration-page";
 import { PatientProfilePage } from "@/pages/patients/patient-profile-page";
 import { AppointmentsPage } from "@/pages/appointments/appointments-page";
+import { ConsultationPage } from "@/pages/consultations/consultation-page";
+import { MedicinesPage } from "@/pages/medicines/medicines-page";
+import PharmacyPage from "@/pages/pharmacy/pharmacy-page";
+import { InventoryPage } from "@/pages/inventory/inventory-page";
+import { LaboratoryPage } from "./pages/laboratory/laboratory-page";
+import DoctorRegistrationPage from "@/pages/doctors/DoctorRegistrationPage";
+import { DoctorsPage } from "./pages/doctors/DoctorsPage";
+import { DoctorProfilePage } from "@/pages/doctors/DoctorProfilePage";
+import { BillingPage } from "@/pages/billing/billing-page";
+import InvoiceDetailPage from "@/pages/billing/invoice-detail-page";
 
 export const router = createBrowserRouter([
   {
@@ -47,10 +57,29 @@ export const router = createBrowserRouter([
             path: "appointments",
             element: <AppointmentsPage />,
           },
+          {
+            path: "doctors",
+            element: <DoctorsPage />,
+          },
+
+          {
+            path: "doctors/register",
+            element: <DoctorRegistrationPage />,
+          },
+
+          {
+            path: "doctors/:id",
+            element: <DoctorProfilePage />,
+          },
 
           {
             path: "doctors",
-            element: <div>Doctors</div>,
+            element: <DoctorRegistrationPage />,
+          },
+
+          {
+            path: "appointments/:appointmentId/consultation",
+            element: <ConsultationPage />,
           },
 
           {
@@ -63,24 +92,30 @@ export const router = createBrowserRouter([
             element: <div>Prescriptions</div>,
           },
 
+          { path: "laboratory", element: <LaboratoryPage /> },
+
           {
-            path: "laboratory",
-            element: <div>Laboratory</div>,
+            path: "medicines",
+            element: <MedicinesPage />,
           },
 
           {
             path: "pharmacy",
-            element: <div>Pharmacy</div>,
+            element: <PharmacyPage />,
           },
 
           {
             path: "inventory",
-            element: <div>Inventory</div>,
+            element: <InventoryPage />,
           },
 
           {
+            path: "billing/:id",
+            element: <InvoiceDetailPage />,
+          },
+          {
             path: "billing",
-            element: <div>Billing</div>,
+            element: <BillingPage />,
           },
 
           {

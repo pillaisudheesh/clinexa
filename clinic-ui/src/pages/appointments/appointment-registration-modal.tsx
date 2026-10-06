@@ -21,6 +21,7 @@ import type {
 
 import type { Patient } from "@/types/patient";
 import type { Doctor } from "@/types/doctor";
+import { CustomSelect } from "@/components/ui/CustomSelect";
 
 interface AppointmentRegistrationModalProps {
   open: boolean;
@@ -816,37 +817,24 @@ export function AppointmentRegistrationModal({
                 Appointment type
               </label>
 
-              <select
+              <CustomSelect
                 value={form.type}
-                onChange={(event) =>
+                options={APPOINTMENT_TYPES.map((option) => option.value)}
+                displayOptions={Object.fromEntries(
+                  APPOINTMENT_TYPES.map((option) => [
+                    option.value,
+                    option.label,
+                  ]),
+                )}
+                placeholder="Select appointment type"
+                onChange={(value) =>
                   setForm((current) => ({
                     ...current,
-                    type: event.target.value as AppointmentType,
+                    type: value as AppointmentType,
                   }))
                 }
-                className="
-                  h-10
-                  w-full
-                  rounded-xl
-                  border-0
-                  bg-slate-50
-                  px-3
-                  text-sm
-                  text-slate-700
-                  outline-none
-                  ring-1
-                  ring-slate-200/70
-                  focus:bg-white
-                  focus:ring-2
-                  focus:ring-teal-500/20
-                "
-              >
-                {APPOINTMENT_TYPES.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                disabled={saving}
+              />
             </div>
 
             {/* Priority */}
@@ -855,37 +843,21 @@ export function AppointmentRegistrationModal({
                 Priority
               </label>
 
-              <select
+              <CustomSelect
                 value={form.priority}
-                onChange={(event) =>
+                options={PRIORITIES.map((option) => option.value)}
+                displayOptions={Object.fromEntries(
+                  PRIORITIES.map((option) => [option.value, option.label]),
+                )}
+                placeholder="Select priority"
+                onChange={(value) =>
                   setForm((current) => ({
                     ...current,
-                    priority: event.target.value as AppointmentPriority,
+                    priority: value as AppointmentPriority,
                   }))
                 }
-                className="
-                  h-10
-                  w-full
-                  rounded-xl
-                  border-0
-                  bg-slate-50
-                  px-3
-                  text-sm
-                  text-slate-700
-                  outline-none
-                  ring-1
-                  ring-slate-200/70
-                  focus:bg-white
-                  focus:ring-2
-                  focus:ring-teal-500/20
-                "
-              >
-                {PRIORITIES.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                disabled={saving}
+              />
             </div>
 
             {/* Reason */}

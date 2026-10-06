@@ -14,6 +14,7 @@ import {
   MedicalRecord,
   LabOrderItemStatus,
   LabOrderStatus,
+  InvoiceType,
 } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
@@ -671,7 +672,96 @@ export class AppointmentsService {
    * Check patient in.
    */
   async checkIn(clinicId: string, id: string) {
-    return this.changeStatus(clinicId, id, AppointmentStatus.CHECKED_IN);
+    return this.prisma.$transaction(async (tx) => {
+      const appointment = await tx.appointment.findFirst({
+        where: {
+          id,
+          clinicId,
+        },
+        select: {
+          id: true,
+          clinicId: true,
+          patientId: true,
+          status: true,
+          consultationFee: true,
+        },
+      });
+
+      if (!appointment) {
+        throw new NotFoundException('Appointment not found');
+      }
+
+      this.validateStatusTransition(
+        appointment.status,
+        AppointmentStatus.CHECKED_IN,
+      );
+
+      if (!appointment.consultationFee) {
+        throw new BadRequestException(
+          'Consultation fee is not configured for this appointment',
+        );
+      }
+
+      const existingInvoice = await tx.invoice.findFirst({
+        where: {
+          appointmentId: appointment.id,
+          type: InvoiceType.CONSULTATION,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (existingInvoice) {
+        throw new ConflictException(
+          'Consultation invoice already exists for this appointment',
+        );
+      }
+
+      const consultationFee = appointment.consultationFee;
+
+      const invoiceNumber = await this.generateInvoiceNumber(tx, clinicId);
+
+      await tx.invoice.create({
+        data: {
+          invoiceNumber,
+          clinicId: appointment.clinicId,
+          patientId: appointment.patientId,
+          appointmentId: appointment.id,
+          type: InvoiceType.CONSULTATION,
+          status: InvoiceStatus.DRAFT,
+
+          subtotal: consultationFee,
+          discount: new Prisma.Decimal('0.00'),
+          tax: new Prisma.Decimal('0.00'),
+          total: consultationFee,
+
+          amountPaid: new Prisma.Decimal('0.00'),
+          balanceDue: consultationFee,
+
+          items: {
+            create: {
+              description: 'Consultation',
+              quantity: new Prisma.Decimal('1.00'),
+              unitPrice: consultationFee,
+              amount: consultationFee,
+            },
+          },
+        },
+      });
+
+      const updatedAppointment = await tx.appointment.update({
+        where: {
+          id: appointment.id,
+        },
+        data: {
+          status: AppointmentStatus.CHECKED_IN,
+        },
+        include: this.appointmentInclude(),
+      });
+
+      return this.toResponse(updatedAppointment);
+    });
   }
 
   /**
@@ -735,59 +825,21 @@ export class AppointmentsService {
       }
 
       // Prevent duplicate invoices.
-      const existingInvoice = await tx.invoice.findUnique({
+      const consultationInvoice = await tx.invoice.findFirst({
         where: {
           appointmentId: appointment.id,
+          type: InvoiceType.CONSULTATION,
         },
         select: {
           id: true,
         },
       });
 
-      if (existingInvoice) {
-        throw new ConflictException(
-          'An invoice already exists for this appointment',
-        );
-      }
-
-      if (!appointment.consultationFee) {
+      if (!consultationInvoice) {
         throw new BadRequestException(
-          'Consultation fee is not configured for this appointment',
+          'Consultation invoice is required before completing the appointment',
         );
       }
-
-      const consultationFee = appointment.consultationFee;
-
-      const invoiceNumber = await this.generateInvoiceNumber(tx, clinicId);
-
-      // Create draft invoice
-      await tx.invoice.create({
-        data: {
-          invoiceNumber,
-          clinicId: appointment.clinicId,
-          patientId: appointment.patientId,
-          appointmentId: appointment.id,
-
-          status: InvoiceStatus.DRAFT,
-
-          subtotal: consultationFee,
-          discount: new Prisma.Decimal('0.00'),
-          tax: new Prisma.Decimal('0.00'),
-          total: consultationFee,
-
-          amountPaid: new Prisma.Decimal('0.00'),
-          balanceDue: consultationFee,
-
-          items: {
-            create: {
-              description: 'Consultation',
-              quantity: new Prisma.Decimal('1.00'),
-              unitPrice: consultationFee,
-              amount: consultationFee,
-            },
-          },
-        },
-      });
 
       // Complete appointment
       const updatedAppointment = await tx.appointment.update({
@@ -849,7 +901,7 @@ export class AppointmentsService {
           },
         },
 
-        invoice: {
+        invoices: {
           include: {
             items: true,
           },
@@ -882,9 +934,7 @@ export class AppointmentsService {
         this.mapLabOrder(labOrder),
       ),
 
-      invoice: appointment.invoice
-        ? this.mapInvoice(appointment.invoice)
-        : null,
+      invoices: appointment.invoices.map((invoice) => this.mapInvoice(invoice)),
     };
   }
 
@@ -895,6 +945,7 @@ export class AppointmentsService {
     patientId: string;
     appointmentId: string;
     status: InvoiceStatus;
+    type: InvoiceType;
 
     subtotal: Prisma.Decimal;
     discount: Prisma.Decimal;
@@ -931,6 +982,7 @@ export class AppointmentsService {
       appointmentId: invoice.appointmentId,
 
       status: invoice.status,
+      type: invoice.type,
 
       subtotal: Number(invoice.subtotal),
 

@@ -3,18 +3,24 @@ import {
   ArrowRight,
   CalendarDays,
   CheckCircle2,
+  CheckCircle,
   Clock3,
+  Eye,
   FlaskConical,
   IndianRupee,
+  LogIn,
+  Play,
   Plus,
   Stethoscope,
   UsersRound,
   WalletCards,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/auth/auth-context";
+import { appointmentService } from "@/services/appointment-service";
 
 import type {
   DashboardAppointment,
@@ -90,16 +96,31 @@ function statusClass(status: string) {
 }
 
 export function DashboardPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, hasPermission } = useAuth();
+  const navigate = useNavigate();
 
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
 
   const [loading, setLoading] = useState(true);
 
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [confirmingAppointmentId, setConfirmingAppointmentId] = useState<
+    string | null
+  >(null);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [actionType, setActionType] = useState<
+    "check-in" | "start" | "confirm" | null
+  >(null);
 
-  const loadDashboard = useCallback(async () => {
-    setLoading(true);
+  const canUpdateAppointments = hasPermission("APPOINTMENT_UPDATE");
+  const canReadMedicalRecords = hasPermission("MEDICAL_RECORD_READ");
+
+  const loadDashboard = useCallback(async (showLoader = true) => {
+    if (showLoader) {
+      setLoading(true);
+    }
+
     setError(null);
 
     try {
@@ -109,9 +130,17 @@ export function DashboardPage() {
     } catch (requestError) {
       console.error("Unable to load dashboard.", requestError);
 
-      setError("We couldn't load the dashboard data. Please try again.");
+      if (showLoader) {
+        setError("We couldn't load the dashboard data. Please try again.");
+      } else {
+        setActionError(
+          "The appointment was updated, but the dashboard could not be refreshed.",
+        );
+      }
     } finally {
-      setLoading(false);
+      if (showLoader) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -120,6 +149,66 @@ export function DashboardPage() {
       loadDashboard();
     }
   }, [authLoading, user, loadDashboard]);
+
+  const runAppointmentAction = async (
+    appointmentId: string,
+    action: "check-in" | "start",
+  ) => {
+    if (!canUpdateAppointments || actionLoadingId) {
+      return;
+    }
+
+    try {
+      setActionError(null);
+      setActionLoadingId(appointmentId);
+      setActionType(action);
+
+      if (action === "check-in") {
+        await appointmentService.checkInAppointment(appointmentId);
+      } else {
+        await appointmentService.startConsultation(appointmentId);
+      }
+
+      await loadDashboard(false);
+
+      if (action === "start") {
+        navigate(`/appointments/${appointmentId}/consultation`);
+      }
+    } catch (requestError) {
+      console.error(`Unable to ${action} appointment.`, requestError);
+      setActionError(
+        action === "check-in"
+          ? "Unable to check in this patient. Please try again."
+          : "Unable to start this consultation. Please try again.",
+      );
+    } finally {
+      setActionLoadingId(null);
+      setActionType(null);
+    }
+  };
+
+  const handleConfirmAppointment = async () => {
+    if (!confirmingAppointmentId || !canUpdateAppointments) {
+      return;
+    }
+
+    try {
+      setActionError(null);
+      setActionLoadingId(confirmingAppointmentId);
+      setActionType("confirm");
+
+      await appointmentService.confirmAppointment(confirmingAppointmentId);
+
+      setConfirmingAppointmentId(null);
+      await loadDashboard(false);
+    } catch (requestError) {
+      console.error("Unable to confirm appointment.", requestError);
+      setActionError("Unable to confirm this appointment. Please try again.");
+    } finally {
+      setActionLoadingId(null);
+      setActionType(null);
+    }
+  };
 
   const appointmentStats = useMemo(() => {
     const counts = new Map(
@@ -162,7 +251,7 @@ export function DashboardPage() {
 
           <button
             type="button"
-            onClick={loadDashboard}
+            onClick={() => loadDashboard()}
             className="
               mt-5
               rounded-xl
@@ -197,6 +286,26 @@ export function DashboardPage() {
             <TodayAppointments
               appointments={summary?.todayAppointments ?? []}
               canView={summary?.permissions.appointments ?? false}
+              canUpdate={canUpdateAppointments}
+              canReadMedicalRecords={canReadMedicalRecords}
+              actionLoadingId={actionLoadingId}
+              actionType={actionType}
+              onConfirm={(appointmentId) => {
+                setActionError(null);
+                setConfirmingAppointmentId(appointmentId);
+              }}
+              onCheckIn={(appointmentId) =>
+                runAppointmentAction(appointmentId, "check-in")
+              }
+              onStartConsultation={(appointmentId) =>
+                runAppointmentAction(appointmentId, "start")
+              }
+              onContinueConsultation={(appointmentId) =>
+                navigate(`/appointments/${appointmentId}/consultation`)
+              }
+              onViewConsultation={(appointmentId) =>
+                navigate(`/appointments/${appointmentId}/consultation`)
+              }
             />
 
             <AppointmentOverview
@@ -214,6 +323,52 @@ export function DashboardPage() {
             <QuickActions permissions={summary?.permissions} />
           </div>
         </>
+      )}
+
+      {actionError && (
+        <div
+          role="alert"
+          className="
+            rounded-xl
+            bg-red-50
+            px-4
+            py-3
+            text-sm
+            font-medium
+            text-red-700
+            ring-1
+            ring-inset
+            ring-red-100
+          "
+        >
+          <div className="flex items-start justify-between gap-3">
+            <span>{actionError}</span>
+            <button
+              type="button"
+              onClick={() => setActionError(null)}
+              className="shrink-0 rounded-lg p-0.5 text-red-400 transition-colors hover:bg-red-100 hover:text-red-600"
+              aria-label="Dismiss error"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {confirmingAppointmentId && (
+        <ConfirmAppointmentDialog
+          loading={
+            actionLoadingId === confirmingAppointmentId &&
+            actionType === "confirm"
+          }
+          onCancel={() => {
+            if (actionLoadingId) {
+              return;
+            }
+            setConfirmingAppointmentId(null);
+          }}
+          onConfirm={handleConfirmAppointment}
+        />
       )}
     </div>
   );
@@ -453,9 +608,27 @@ function MetricGrid({ summary }: { summary: DashboardSummary | null }) {
 function TodayAppointments({
   appointments,
   canView,
+  canUpdate,
+  canReadMedicalRecords,
+  actionLoadingId,
+  actionType,
+  onConfirm,
+  onCheckIn,
+  onStartConsultation,
+  onContinueConsultation,
+  onViewConsultation,
 }: {
   appointments: DashboardAppointment[];
   canView: boolean;
+  canUpdate: boolean;
+  canReadMedicalRecords: boolean;
+  actionLoadingId: string | null;
+  actionType: "check-in" | "start" | "confirm" | null;
+  onConfirm: (appointmentId: string) => void;
+  onCheckIn: (appointmentId: string) => void;
+  onStartConsultation: (appointmentId: string) => void;
+  onContinueConsultation: (appointmentId: string) => void;
+  onViewConsultation: (appointmentId: string) => void;
 }) {
   return (
     <section
@@ -509,85 +682,367 @@ function TodayAppointments({
       ) : appointments.length === 0 ? (
         <EmptyState text="No appointments scheduled for today." />
       ) : (
-        <div className="border-0">
-          {appointments.map((appointment, index) => (
-            <div
-              key={appointment.id}
-              className="
-      group
-      relative
-      flex
-      flex-col
-      gap-3
-      px-5
-      py-4
-      transition-colors
-      duration-150
-      hover:bg-slate-50/60
-      sm:flex-row
-      sm:items-center
-      sm:px-6
-    "
-            >
-              {index > 0 && (
-                <span
-                  aria-hidden="true"
-                  className="
-          pointer-events-none
-          absolute
-          inset-x-0
-          top-0
-          h-[1.5px]
-          bg-slate-200/35
-        "
-                />
-              )}
+        <div>
+          {appointments.map((appointment, index) => {
+            const isActionLoading = actionLoadingId === appointment.id;
+            const isScheduled = appointment.status === "SCHEDULED";
+            const isConfirmed = appointment.status === "CONFIRMED";
+            const isCheckedIn = appointment.status === "CHECKED_IN";
+            const isInConsultation = appointment.status === "IN_CONSULTATION";
+            const isCompleted = appointment.status === "COMPLETED";
+
+            return (
               <div
+                key={appointment.id}
                 className="
-                    flex
-                    min-w-[76px]
-                    items-center
-                    gap-2
-                    text-sm
-                    font-semibold
-                    text-slate-800
-                  "
+                  relative
+                  px-5
+                  py-4
+                  transition-colors
+                  duration-150
+                  hover:bg-slate-50/60
+                  sm:px-6
+                "
               >
-                <Clock3 className="size-4 text-teal-500" />
-                {formatTime(appointment.startTime)}
+                {index > 0 && (
+                  <span
+                    aria-hidden="true"
+                    className="
+                      pointer-events-none
+                      absolute
+                      inset-x-0
+                      top-0
+                      h-px
+                      bg-slate-200/35
+                    "
+                  />
+                )}
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <div
+                    className="
+                      flex
+                      min-w-[76px]
+                      items-center
+                      gap-2
+                      text-sm
+                      font-semibold
+                      text-slate-800
+                    "
+                  >
+                    <Clock3 className="size-4 text-teal-500" />
+                    {formatTime(appointment.startTime)}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-slate-800">
+                      {appointment.patient.name}
+                    </p>
+
+                    <p className="mt-0.5 truncate text-xs text-slate-400">
+                      {appointment.doctor.name}
+                      {" · "}
+                      {appointment.type.toLowerCase().replaceAll("_", " ")}
+                    </p>
+                  </div>
+
+                  <span
+                    className={`
+                      inline-flex
+                      w-fit
+                      rounded-full
+                      px-2.5
+                      py-1
+                      text-[11px]
+                      font-semibold
+                      ${statusClass(appointment.status)}
+                    `}
+                  >
+                    {statusLabel(appointment.status)}
+                  </span>
+                </div>
+
+                {canUpdate && (
+                  <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+                    {isScheduled && (
+                      <button
+                        type="button"
+                        disabled={Boolean(actionLoadingId)}
+                        onClick={() => onConfirm(appointment.id)}
+                        className="
+                          inline-flex
+                          items-center
+                          gap-1.5
+                          rounded-lg
+                          bg-teal-50
+                          px-3
+                          py-2
+                          text-xs
+                          font-semibold
+                          text-teal-700
+                          ring-1
+                          ring-inset
+                          ring-teal-100
+                          transition-colors
+                          hover:bg-teal-100
+                          disabled:cursor-not-allowed
+                          disabled:opacity-50
+                        "
+                      >
+                        {isActionLoading && actionType === "confirm" ? (
+                          <span className="size-3.5 animate-spin rounded-full border-2 border-teal-200 border-t-teal-600" />
+                        ) : (
+                          <CheckCircle className="size-3.5" />
+                        )}
+                        Confirm
+                      </button>
+                    )}
+
+                    {isConfirmed && (
+                      <button
+                        type="button"
+                        disabled={Boolean(actionLoadingId)}
+                        onClick={() => onCheckIn(appointment.id)}
+                        className="
+                          inline-flex
+                          items-center
+                          gap-1.5
+                          rounded-lg
+                          bg-amber-50
+                          px-3
+                          py-2
+                          text-xs
+                          font-semibold
+                          text-amber-700
+                          ring-1
+                          ring-inset
+                          ring-amber-100
+                          transition-colors
+                          hover:bg-amber-100
+                          disabled:cursor-not-allowed
+                          disabled:opacity-50
+                        "
+                      >
+                        {isActionLoading && actionType === "check-in" ? (
+                          <span className="size-3.5 animate-spin rounded-full border-2 border-amber-200 border-t-amber-600" />
+                        ) : (
+                          <LogIn className="size-3.5" />
+                        )}
+                        Check in
+                      </button>
+                    )}
+
+                    {isCheckedIn && (
+                      <button
+                        type="button"
+                        disabled={Boolean(actionLoadingId)}
+                        onClick={() => onStartConsultation(appointment.id)}
+                        className="
+                          inline-flex
+                          items-center
+                          gap-1.5
+                          rounded-lg
+                          bg-violet-50
+                          px-3
+                          py-2
+                          text-xs
+                          font-semibold
+                          text-violet-700
+                          ring-1
+                          ring-inset
+                          ring-violet-100
+                          transition-colors
+                          hover:bg-violet-100
+                          disabled:cursor-not-allowed
+                          disabled:opacity-50
+                        "
+                      >
+                        {isActionLoading && actionType === "start" ? (
+                          <span className="size-3.5 animate-spin rounded-full border-2 border-violet-200 border-t-violet-600" />
+                        ) : (
+                          <Play className="size-3.5" />
+                        )}
+                        Start consultation
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {isInConsultation && (
+                  <div className="mt-3 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => onContinueConsultation(appointment.id)}
+                      className="
+                        inline-flex
+                        items-center
+                        gap-1.5
+                        rounded-lg
+                        bg-violet-50
+                        px-3
+                        py-2
+                        text-xs
+                        font-semibold
+                        text-violet-700
+                        ring-1
+                        ring-inset
+                        ring-violet-100
+                        transition-colors
+                        hover:bg-violet-100
+                      "
+                    >
+                      <Play className="size-3.5" />
+                      Continue consultation
+                    </button>
+                  </div>
+                )}
+
+                {isCompleted && canReadMedicalRecords && (
+                  <div className="mt-3 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => onViewConsultation(appointment.id)}
+                      className="
+                        inline-flex
+                        items-center
+                        gap-1.5
+                        rounded-lg
+                        bg-slate-50
+                        px-3
+                        py-2
+                        text-xs
+                        font-semibold
+                        text-slate-600
+                        ring-1
+                        ring-inset
+                        ring-slate-200
+                        transition-colors
+                        hover:bg-slate-100
+                      "
+                    >
+                      <Eye className="size-3.5" />
+                      View consultation
+                    </button>
+                  </div>
+                )}
               </div>
-
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-slate-800">
-                  {appointment.patient.name}
-                </p>
-
-                <p className="mt-0.5 truncate text-xs text-slate-400">
-                  {appointment.doctor.name}
-                  {" · "}
-                  {appointment.type.toLowerCase().replaceAll("_", " ")}
-                </p>
-              </div>
-
-              <span
-                className={`
-                    inline-flex
-                    w-fit
-                    rounded-full
-                    px-2.5
-                    py-1
-                    text-[11px]
-                    font-semibold
-                    ${statusClass(appointment.status)}
-                  `}
-              >
-                {statusLabel(appointment.status)}
-              </span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>
+  );
+}
+
+function ConfirmAppointmentDialog({
+  loading,
+  onCancel,
+  onConfirm,
+}: {
+  loading: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/20 p-4 backdrop-blur-[2px]"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !loading) {
+          onCancel();
+        }
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-appointment-title"
+        className="
+          w-full
+          max-w-md
+          rounded-2xl
+          bg-white
+          p-5
+          shadow-[0_20px_60px_rgba(15,23,42,0.14)]
+          ring-1
+          ring-slate-200/70
+          sm:p-6
+        "
+      >
+        <div className="flex items-start gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-600">
+            <CheckCircle2 className="size-5" />
+          </div>
+
+          <div className="min-w-0">
+            <h2
+              id="confirm-appointment-title"
+              className="text-base font-semibold text-slate-900"
+            >
+              Confirm appointment?
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-slate-500">
+              This will mark the appointment as confirmed and allow the patient
+              to proceed to check-in.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            disabled={loading}
+            onClick={onCancel}
+            className="
+              rounded-xl
+              bg-white
+              px-4
+              py-2.5
+              text-sm
+              font-semibold
+              text-slate-600
+              ring-1
+              ring-slate-200/80
+              transition-colors
+              hover:bg-slate-50
+              disabled:cursor-not-allowed
+              disabled:opacity-50
+            "
+          >
+            Cancel
+          </button>
+
+          <button
+            type="button"
+            disabled={loading}
+            onClick={onConfirm}
+            className="
+              inline-flex
+              items-center
+              justify-center
+              gap-2
+              rounded-xl
+              bg-teal-600
+              px-4
+              py-2.5
+              text-sm
+              font-semibold
+              text-white
+              shadow-sm
+              transition-colors
+              hover:bg-teal-700
+              disabled:cursor-not-allowed
+              disabled:opacity-60
+            "
+          >
+            {loading && (
+              <span className="size-4 animate-spin rounded-full border-2 border-teal-200 border-t-white" />
+            )}
+            {loading ? "Confirming..." : "Confirm appointment"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

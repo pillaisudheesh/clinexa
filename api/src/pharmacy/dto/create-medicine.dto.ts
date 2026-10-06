@@ -7,7 +7,7 @@ import {
   Min,
 } from 'class-validator';
 
-export class CreateMedicineDto {
+export class CreatePharmacyMedicineDto {
   @ApiProperty({
     example: 'Paracetamol 500mg',
   })
