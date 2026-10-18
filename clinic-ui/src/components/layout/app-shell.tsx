@@ -2,6 +2,7 @@ import {
   BarChart3,
   Bell,
   CalendarDays,
+  Building2,
   ChevronDown,
   FlaskConical,
   LayoutDashboard,
@@ -15,12 +16,30 @@ import {
   Stethoscope,
   UsersRound,
   X,
+  Store,
 } from "lucide-react";
 import { NavLink, useLocation, Outlet } from "react-router-dom";
 import { type ComponentType, useEffect, useRef, useState } from "react";
 
-import { ClinexaBrand } from "@/components/brand/clinexa-brand";
+import { SamaRootBrand } from "@/components/brand/samaroot-brand";
+import { ClinicLogo } from "@/components/clinic-logo";
 import { useAuth } from "@/auth/auth-context";
+import { clinicSettingsService } from "@/services/clinic-settings-service";
+
+function getDisplayRole(
+  user:
+    | {
+        role?: string | null;
+        roles?: Array<string | { name?: string; code?: string }>;
+      }
+    | null
+    | undefined,
+) {
+  const firstRole = user?.roles?.[0];
+  if (user?.role) return user.role;
+  if (typeof firstRole === "string") return firstRole;
+  return firstRole?.name ?? firstRole?.code ?? "User";
+}
 
 interface NavigationItem {
   label: string;
@@ -70,7 +89,7 @@ const navigation: NavigationItem[] = [
   {
     label: "Pharmacy",
     path: "/pharmacy",
-    icon: Pill,
+    icon: Store,
     permission: "PHARMACY_READ",
   },
   {
@@ -94,6 +113,24 @@ const navigation: NavigationItem[] = [
 ];
 
 const secondaryNavigation: NavigationItem[] = [
+  {
+    label: "Clinics",
+    path: "/clinics",
+    icon: Building2,
+    permission: "CLINIC_READ",
+  },
+  {
+    label: "Departments",
+    path: "/departments",
+    icon: Building2,
+    permission: "DEPARTMENT_READ",
+  },
+  {
+    label: "Clinic Configuration",
+    path: "/clinic-configuration",
+    icon: Settings,
+    permission: "SETTINGS_READ",
+  },
   {
     label: "Settings",
     path: "/settings",
@@ -137,17 +174,52 @@ function getPageTitle(pathname: string): string {
     (entry) => pathname === entry.path || pathname.startsWith(`${entry.path}/`),
   );
 
-  return item?.label ?? "Clinexa";
+  return item?.label ?? "SamaRoot";
 }
 
 export function AppShell() {
   const location = useLocation();
 
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [clinicBranding, setClinicBranding] = useState<{
+    name: string;
+    logoUrl?: string | null;
+    tagline?: string | null;
+    brandColor?: string | null;
+  } | null>(null);
 
   const pageTitle = getPageTitle(location.pathname);
 
   const { user, logout, hasPermission } = useAuth();
+
+  useEffect(() => {
+    let active = true;
+    if (!user) {
+      setClinicBranding(null);
+      return;
+    }
+    const loadClinicBranding = () => {
+      clinicSettingsService
+        .getBranding()
+        .then((response) => {
+          if (active) setClinicBranding(response.data);
+        })
+        .catch((error) => {
+          console.error("Unable to load clinic branding", error);
+          if (active) setClinicBranding(null);
+        });
+    };
+    const handleBrandingUpdated = () => loadClinicBranding();
+    loadClinicBranding();
+    window.addEventListener("clinic-branding-updated", handleBrandingUpdated);
+    return () => {
+      active = false;
+      window.removeEventListener(
+        "clinic-branding-updated",
+        handleBrandingUpdated,
+      );
+    };
+  }, [user?.clinicId]);
 
   const [sidebarUserMenuOpen, setSidebarUserMenuOpen] = useState(false);
 
@@ -184,23 +256,27 @@ export function AppShell() {
 
   const userName = user
     ? `${user.firstName}${user.lastName ? ` ${user.lastName}` : ""}`
-    : "Clinexa User";
+    : "SamaRoot User";
 
   const userInitials = user
     ? `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase()
     : "CU";
 
-  const visibleNavigation = navigation.filter(
-    (item) => !item.permission || hasPermission(item.permission),
-  );
+  // Platform-wide navigation must be based on the explicit server-provided flag,
+  // never on a clinic role name such as SUPER_ADMIN.
+  const canSeeNavigationItem = (item: NavigationItem) => {
+    if (item.path === "/clinics") return user?.isPlatformAdmin === true;
+    return (
+      !item.permission ||
+      user?.isPlatformAdmin === true ||
+      hasPermission(item.permission)
+    );
+  };
 
-  const visibleSecondaryNavigation = secondaryNavigation.filter(
-    (item) => !item.permission || hasPermission(item.permission),
-  );
-
-  const visibleMobileNavigation = mobileNavigation.filter(
-    (item) => !item.permission || hasPermission(item.permission),
-  );
+  const visibleNavigation = navigation.filter(canSeeNavigationItem);
+  const visibleSecondaryNavigation =
+    secondaryNavigation.filter(canSeeNavigationItem);
+  const visibleMobileNavigation = mobileNavigation.filter(canSeeNavigationItem);
 
   return (
     <div
@@ -325,7 +401,20 @@ export function AppShell() {
             onClick={() => setMobileOpen(false)}
             className="flex items-center"
           >
-            <ClinexaBrand className="h-11 w-auto" />
+            <ClinicLogo
+              logoUrl={clinicBranding?.logoUrl}
+              clinicName={clinicBranding?.name}
+              className="size-10 shrink-0 rounded-lg object-contain"
+              fallbackClassName="flex size-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700"
+            />
+            <span className="ml-3 flex min-w-0 flex-col text-left">
+              <span className="max-w-[155px] truncate text-sm font-semibold text-slate-900">
+                {clinicBranding?.name || "Clinic workspace"}
+              </span>
+              <span className="max-w-[155px] truncate text-[11px] text-slate-500">
+                {clinicBranding?.tagline || "Healthcare management"}
+              </span>
+            </span>
           </NavLink>
 
           <button
@@ -478,7 +567,7 @@ export function AppShell() {
             text-slate-500
           "
                 >
-                  {user?.role || user?.roles?.[0] || "User"}
+                  {getDisplayRole(user)}
                 </p>
               </div>
 
@@ -555,6 +644,10 @@ export function AppShell() {
               </div>
             )}
           </div>
+        </div>
+        <div className="mx-4 mb-4 mt-2 flex shrink-0 items-center justify-center gap-1.5 pt-4 text-xs text-slate-500">
+          <span>Powered by</span>
+          <SamaRootBrand className="h-5 w-auto" />
         </div>
       </aside>
 
@@ -817,7 +910,7 @@ export function AppShell() {
                       text-slate-400
                     "
                   >
-                    {user?.role || user?.roles?.[0] || "User"}
+                    {getDisplayRole(user)}
                   </p>
                 </div>
 

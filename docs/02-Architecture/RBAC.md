@@ -1,7 +1,7 @@
-# Clinexa Role-Based Access Control (RBAC)
+# SamaRoot Role-Based Access Control (RBAC)
 
 **Document Version:** 1.0 (Draft)
-**Product:** Clinexa
+**Product:** SamaRoot
 
 ---
 
@@ -24,7 +24,7 @@
 
 # 1. Purpose
 
-This document defines the authorization model for Clinexa.
+This document defines the authorization model for SamaRoot.
 
 It specifies:
 
@@ -40,7 +40,7 @@ This document is the source of truth for backend authorization guards and fronte
 
 # 2. RBAC Overview
 
-Clinexa uses **Role-Based Access Control (RBAC)**.
+SamaRoot uses **Role-Based Access Control (RBAC)**.
 
 Every authenticated user is assigned one or more roles.
 
@@ -370,7 +370,7 @@ The authorization model is designed to support future capabilities such as:
 
 # RBAC Principles Summary
 
-Clinexa authorization is built on the following principles:
+SamaRoot authorization is built on the following principles:
 
 * Every action requires explicit permission.
 * Backend authorization is mandatory for all protected operations.
@@ -379,4 +379,4 @@ Clinexa authorization is built on the following principles:
 * Tenant isolation is always enforced.
 * Access is denied by default unless explicitly granted.
 
-> **Clinexa's authorization model ensures that every user has access only to the information and functionality required to perform their responsibilities, protecting patient data while enabling efficient clinical workflows.**
+> **SamaRoot's authorization model ensures that every user has access only to the information and functionality required to perform their responsibilities, protecting patient data while enabling efficient clinical workflows.**

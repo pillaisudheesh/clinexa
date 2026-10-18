@@ -1003,14 +1003,20 @@ export function LaboratoryPage() {
                     </button>
                   ))}
                 </div>
-                <div className="divide-y divide-slate-100 md:hidden">
-                  {orders.map((order) => (
+                <div className="md:hidden">
+                  {orders.map((order, index) => (
                     <button
                       key={order.id}
                       type="button"
                       onClick={() => void openOrder(order)}
-                      className="block w-full p-4 text-left"
+                      className="relative block w-full p-4 text-left"
                     >
+                      {index > 0 && (
+                        <span
+                          aria-hidden="true"
+                          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-slate-200/70"
+                        />
+                      )}
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-slate-800">

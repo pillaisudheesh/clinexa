@@ -18,17 +18,17 @@ export function MobileHeader({ onMenuClick }: MobileHeaderProps) {
         </button>
 
         <div className="flex items-center gap-2">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-clinexa-700 shadow-sm text-white">
+          <div className="flex size-8 items-center justify-center rounded-lg bg-samaroot-700 shadow-sm text-white">
             <HeartPulse className="size-4" />
           </div>
 
-          <span className="font-semibold text-slate-900">Clinexa</span>
+          <span className="font-semibold text-slate-900">SamaRoot</span>
         </div>
       </div>
 
       <button
         type="button"
-        className="relative flex size-9 items-center justify-center rounded-lg text-slate-600 hover:bg-clinexa-50"
+        className="relative flex size-9 items-center justify-center rounded-lg text-slate-600 hover:bg-samaroot-50"
         aria-label="Notifications"
       >
         <Bell className="size-5" />

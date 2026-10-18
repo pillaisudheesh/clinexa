@@ -11,23 +11,20 @@ import {
   UseGuards,
   ParseUUIDPipe,
 } from '@nestjs/common';
-
 import { Request } from 'express';
+import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 import { AppointmentsService } from './appointments.service';
-
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { AppointmentQueryDto } from './dto/appointment-query.dto';
 import { AppointmentAvailabilityQueryDto } from './dto/appointment-availability-query.dto';
+import { ConsultationSummaryResponseDto } from './dto/consultation-summary-response.dto';
 
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { PermissionCodes } from '../auth/constants/permission-codes';
-
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
-import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { ConsultationSummaryResponseDto } from './dto/consultation-summary-response.dto';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -45,7 +42,11 @@ export class AppointmentsController {
   @Post()
   @Permissions(PermissionCodes.APPOINTMENT_CREATE)
   create(@Req() req: AuthenticatedRequest, @Body() dto: CreateAppointmentDto) {
-    return this.appointmentsService.create(req.user.clinicId, dto);
+    return this.appointmentsService.create(
+      req.user.clinicId,
+      dto,
+      req.user.userId,
+    );
   }
 
   @Get()
@@ -79,37 +80,62 @@ export class AppointmentsController {
     @Param('id') id: string,
     @Body() dto: UpdateAppointmentDto,
   ) {
-    return this.appointmentsService.update(req.user.clinicId, id, dto);
+    return this.appointmentsService.update(
+      req.user.clinicId,
+      id,
+      dto,
+      req.user.userId,
+    );
   }
 
   @Post(':id/confirm')
   @Permissions(PermissionCodes.APPOINTMENT_UPDATE)
   confirm(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
-    return this.appointmentsService.confirm(req.user.clinicId, id);
+    return this.appointmentsService.confirm(
+      req.user.clinicId,
+      id,
+      req.user.userId,
+    );
   }
 
   @Post(':id/check-in')
   @Permissions(PermissionCodes.APPOINTMENT_UPDATE)
   checkIn(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
-    return this.appointmentsService.checkIn(req.user.clinicId, id);
+    return this.appointmentsService.checkIn(
+      req.user.clinicId,
+      id,
+      req.user.userId,
+    );
   }
 
   @Post(':id/start')
-  @Permissions(PermissionCodes.APPOINTMENT_UPDATE)
+  @Permissions(PermissionCodes.CONSULTATION_START)
   startConsultation(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
-    return this.appointmentsService.startConsultation(req.user.clinicId, id);
+    return this.appointmentsService.startConsultation(
+      req.user.clinicId,
+      id,
+      req.user.userId,
+    );
   }
 
   @Post(':id/complete')
   @Permissions(PermissionCodes.APPOINTMENT_UPDATE)
   complete(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
-    return this.appointmentsService.complete(req.user.clinicId, id);
+    return this.appointmentsService.complete(
+      req.user.clinicId,
+      id,
+      req.user.userId,
+    );
   }
 
   @Post(':id/no-show')
   @Permissions(PermissionCodes.APPOINTMENT_UPDATE)
   markNoShow(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
-    return this.appointmentsService.markNoShow(req.user.clinicId, id);
+    return this.appointmentsService.markNoShow(
+      req.user.clinicId,
+      id,
+      req.user.userId,
+    );
   }
 
   @Delete(':id')
@@ -119,7 +145,12 @@ export class AppointmentsController {
     @Param('id') id: string,
     @Body('reason') reason?: string,
   ) {
-    return this.appointmentsService.cancel(req.user.clinicId, id, reason);
+    return this.appointmentsService.cancel(
+      req.user.clinicId,
+      id,
+      reason,
+      req.user.userId,
+    );
   }
 
   @Get(':id/consultation')
@@ -148,8 +179,7 @@ export class AppointmentsController {
   })
   getConsultation(
     @Req() req: AuthenticatedRequest,
-    @Param('id', new ParseUUIDPipe())
-    id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
   ): Promise<ConsultationSummaryResponseDto> {
     return this.appointmentsService.getConsultation(req.user.clinicId, id);
   }

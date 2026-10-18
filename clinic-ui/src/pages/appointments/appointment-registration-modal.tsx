@@ -141,6 +141,10 @@ export function AppointmentRegistrationModal({
 
   const [loadingSlots, setLoadingSlots] = useState(false);
 
+  const [manualTimeEntry, setManualTimeEntry] = useState(false);
+  const [manualWorkingHours, setManualWorkingHours] = useState({ startTime: "09:00", endTime: "18:00" });
+  const [manualSlotDuration, setManualSlotDuration] = useState(30);
+
   const [slotError, setSlotError] = useState<string | null>(null);
 
   const [saving, setSaving] = useState(false);
@@ -227,6 +231,9 @@ export function AppointmentRegistrationModal({
     setShowDoctors(false);
 
     setSlots([]);
+    setManualTimeEntry(false);
+    setManualWorkingHours({ startTime: "09:00", endTime: "18:00" });
+    setManualSlotDuration(30);
     setSlotError(null);
     setError(null);
     setSaving(false);
@@ -275,6 +282,7 @@ export function AppointmentRegistrationModal({
   useEffect(() => {
     if (!form.doctorId || !form.appointmentDate) {
       setSlots([]);
+      setManualTimeEntry(false);
       setSlotError(null);
       return;
     }
@@ -299,6 +307,11 @@ export function AppointmentRegistrationModal({
 
         if (!cancelled) {
           setSlots(Array.isArray(response.slots) ? response.slots : []);
+          setManualTimeEntry(Boolean(response.manualTimeEntry));
+          setManualWorkingHours(
+            response.workingHours ?? { startTime: "09:00", endTime: "18:00" },
+          );
+          setManualSlotDuration(response.slotDuration || 30);
         }
       } catch (err) {
         console.error("Unable to load appointment availability.", err);
@@ -335,6 +348,14 @@ export function AppointmentRegistrationModal({
       startTime: slot.startTime,
       endTime: slot.endTime,
     }));
+  };
+
+  const handleManualStartTimeChange = (startTime: string) => {
+    const [hours, minutes] = startTime.split(":").map(Number);
+    const endMinutes = hours * 60 + minutes + manualSlotDuration;
+    const endTime = `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`;
+
+    setForm((current) => ({ ...current, startTime, endTime }));
   };
 
   const handleCreate = async () => {
@@ -390,6 +411,14 @@ export function AppointmentRegistrationModal({
       setSaving(false);
     }
   };
+
+  const manualEndMinutes =
+    Number(manualWorkingHours.endTime.slice(0, 2)) * 60 +
+    Number(manualWorkingHours.endTime.slice(3, 5));
+  const manualLatestStartMinutes = manualEndMinutes - manualSlotDuration;
+  const manualLatestStartTime = `${String(
+    Math.floor(manualLatestStartMinutes / 60),
+  ).padStart(2, "0")}:${String(manualLatestStartMinutes % 60).padStart(2, "0")}`;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/20 p-4 backdrop-blur-[2px]">
@@ -754,6 +783,38 @@ export function AppointmentRegistrationModal({
               ) : slotError ? (
                 <div className="rounded-xl bg-red-50 px-4 py-3 text-xs text-red-500">
                   {slotError}
+                </div>
+              ) : manualTimeEntry ? (
+                <div className="space-y-3 rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200/70">
+                  <p className="text-xs text-slate-600">
+                    This doctor has no schedule configured. Choose a start time manually; appointments are limited to {manualWorkingHours.startTime}–{manualWorkingHours.endTime} and {manualSlotDuration}-minute duration until a schedule is configured.
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="mb-1 block text-[11px] font-semibold text-slate-500">Start time</label>
+                      <input
+                        type="time"
+                        min={manualWorkingHours.startTime}
+                        max={manualLatestStartTime}
+                        step={manualSlotDuration * 60}
+                        value={form.startTime}
+                        onChange={(event) => handleManualStartTimeChange(event.target.value)}
+                        className="h-10 w-full rounded-xl bg-white px-3 text-sm text-slate-700 outline-none ring-1 ring-slate-200/70 focus:ring-2 focus:ring-teal-500/20"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-[11px] font-semibold text-slate-500">End time</label>
+                      <input
+                        type="time"
+                        value={form.endTime}
+                        readOnly
+                        className="h-10 w-full rounded-xl bg-slate-100 px-3 text-sm text-slate-500 outline-none ring-1 ring-slate-200/70"
+                      />
+                    </div>
+                  </div>
+                  {form.startTime && form.endTime && (
+                    <p className="text-[10px] text-teal-700">Selected {form.startTime}–{form.endTime}</p>
+                  )}
                 </div>
               ) : slots.length === 0 && !loadingSlots ? (
                 <div className="rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-400">

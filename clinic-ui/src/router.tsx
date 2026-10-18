@@ -20,6 +20,12 @@ import { DoctorsPage } from "./pages/doctors/DoctorsPage";
 import { DoctorProfilePage } from "@/pages/doctors/DoctorProfilePage";
 import { BillingPage } from "@/pages/billing/billing-page";
 import InvoiceDetailPage from "@/pages/billing/invoice-detail-page";
+import { Patient360Page } from "./pages/patients/patient-360-page";
+import { ReportsPage } from "./pages/reports/reports-page";
+import { SettingsPage } from "./pages/settings/settings-page";
+import { ClinicsPage } from "./pages/clinics/clinics-page";
+import { ClinicConfigurationPage } from "./pages/clinics/clinic-configuration-page";
+import { DepartmentsPage } from "./pages/departments/departments-page";
 
 export const router = createBrowserRouter([
   {
@@ -40,8 +46,18 @@ export const router = createBrowserRouter([
           },
 
           {
+            path: "departments",
+            element: <DepartmentsPage />,
+          },
+
+          {
             path: "patients/:id",
             element: <PatientProfilePage />,
+          },
+
+          {
+            path: "patients/:id/360",
+            element: <Patient360Page />,
           },
 
           {
@@ -120,12 +136,20 @@ export const router = createBrowserRouter([
 
           {
             path: "reports",
-            element: <div>Reports</div>,
+            element: <ReportsPage />,
           },
 
           {
+            path: "clinics",
+            element: <ClinicsPage />,
+          },
+          {
             path: "settings",
-            element: <div>Settings</div>,
+            element: <SettingsPage />,
+          },
+          {
+            path: "clinic-configuration",
+            element: <ClinicConfigurationPage />,
           },
         ],
       },

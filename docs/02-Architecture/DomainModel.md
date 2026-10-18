@@ -1,7 +1,7 @@
-# Clinexa Domain Model
+# SamaRoot Domain Model
 
 **Document Version:** 1.0 (Draft)
-**Product:** Clinexa
+**Product:** SamaRoot
 **Domain:** Outpatient Clinic Management Platform
 
 ---
@@ -26,7 +26,7 @@
 
 # 1. Purpose
 
-This document defines the business domain model for Clinexa.
+This document defines the business domain model for SamaRoot.
 
 It provides a shared understanding of the core business concepts, their relationships, lifecycle, and rules. It serves as the bridge between the Software Requirements Specification (SRS) and the technical implementation.
 
@@ -36,7 +36,7 @@ The domain model should be used by product owners, developers, testers, and arch
 
 # 2. Domain Overview
 
-Clinexa is a cloud-based platform that manages the complete outpatient journey of a patient.
+SamaRoot is a cloud-based platform that manages the complete outpatient journey of a patient.
 
 The platform supports the following high-level workflow:
 
@@ -68,11 +68,11 @@ Every interaction should become part of the patient's longitudinal clinical reco
 
 # 3. Ubiquitous Language
 
-The following terms have specific meanings within Clinexa and should be used consistently.
+The following terms have specific meanings within SamaRoot and should be used consistently.
 
 | Term                 | Meaning                                                       |
 | -------------------- | ------------------------------------------------------------- |
-| Clinic               | A healthcare organization using Clinexa. Represents a tenant. |
+| Clinic               | A healthcare organization using SamaRoot. Represents a tenant. |
 | Patient              | A person receiving medical care.                              |
 | Doctor               | A licensed healthcare provider delivering consultations.      |
 | Appointment          | A scheduled visit between a patient and a doctor.             |
@@ -89,7 +89,7 @@ These definitions should remain consistent across documentation, APIs, UI labels
 
 # 4. Core Business Domains
 
-Clinexa is divided into the following domains.
+SamaRoot is divided into the following domains.
 
 ## Platform
 
@@ -204,7 +204,7 @@ Business operations affecting child entities should be performed through their a
 
 ## Clinic
 
-Represents an outpatient clinic registered on the Clinexa platform.
+Represents an outpatient clinic registered on the SamaRoot platform.
 
 Responsibilities:
 
@@ -529,7 +529,7 @@ Future modules should integrate with the existing aggregates and business rules 
 
 # Domain Model Principles
 
-The Clinexa domain model is guided by the following principles:
+The SamaRoot domain model is guided by the following principles:
 
 * Use a shared business vocabulary across the organization.
 * Model real-world clinical workflows rather than database tables.
@@ -538,4 +538,4 @@ The Clinexa domain model is guided by the following principles:
 * Design for extensibility without introducing unnecessary complexity.
 * Ensure every business operation is traceable and secure.
 
-> **Clinexa models healthcare around the patient journey, ensuring that every business decision, workflow, and technical implementation supports safe, efficient, and consistent outpatient care.**
+> **SamaRoot models healthcare around the patient journey, ensuring that every business decision, workflow, and technical implementation supports safe, efficient, and consistent outpatient care.**

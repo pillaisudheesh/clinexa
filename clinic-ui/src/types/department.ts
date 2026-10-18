@@ -2,10 +2,22 @@ export interface Department {
   id: string;
   code: string;
   name: string;
+  description: string | null;
+  displayOrder: number;
+  isSystem: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
+
+export interface CreateDepartmentRequest {
+  code: string;
+  name: string;
+  description?: string;
+  displayOrder?: number;
+}
+
+export type UpdateDepartmentRequest = Partial<CreateDepartmentRequest>;
 
 export interface DepartmentQuery {
   page?: number;
@@ -17,10 +29,8 @@ export interface DepartmentQuery {
 
 export interface PaginatedDepartments {
   data: Department[];
-  meta: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }

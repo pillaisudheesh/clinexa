@@ -55,6 +55,18 @@ export class DoctorMapper {
         ReferenceMapper.toLanguage(item.language),
       ),
 
+      consultationFee: doctor.consultationFee?.consultationFee.toString(),
+      followUpFee: doctor.consultationFee?.followUpFee?.toString() ?? undefined,
+      emergencyFee: doctor.consultationFee?.emergencyFee?.toString() ?? undefined,
+      teleConsultationFee: doctor.consultationFee?.teleConsultationFee?.toString() ?? undefined,
+      slotDuration: doctor.schedule?.slotDuration,
+      schedule: doctor.schedule?.slots.map((slot) => ({
+        dayOfWeek: slot.dayOfWeek,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        isAvailable: slot.isAvailable,
+      })),
+
       isActive: doctor.isActive,
 
       createdAt: doctor.createdAt,

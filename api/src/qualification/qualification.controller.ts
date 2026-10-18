@@ -11,6 +11,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 
 import { QualificationQueryDto } from './dto/qualification-query.dto';
@@ -19,7 +20,7 @@ import { QualificationService } from './qualification.service';
 @ApiTags('Qualifications')
 @ApiBearerAuth()
 @Controller('qualifications')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class QualificationController {
   constructor(private readonly qualificationsService: QualificationService) {}
 

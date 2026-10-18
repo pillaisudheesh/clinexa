@@ -10,8 +10,10 @@ export interface AuthUser {
   email: string;
   clinicId: string;
   status?: string;
+  /** Explicit platform-wide authority; never infer this from a clinic role name. */
+  isPlatformAdmin?: boolean;
   role?: string | null;
-  roles: string[];
+  roles: Array<string | { id?: string; name?: string; code?: string }>;
   permissions: string[];
 }
 

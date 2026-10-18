@@ -525,7 +525,7 @@ function AppointmentMobileCard({
 }
 
 export function AppointmentsPage() {
-  const { user, hasPermission } = useAuth();
+  const { user, hasPermission, hasRole } = useAuth();
   const navigate = useNavigate();
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -584,14 +584,15 @@ export function AppointmentsPage() {
 
   const canReadMedicalRecords = hasPermission("MEDICAL_RECORD_READ");
 
+  const canStartConsultationRole =
+    (hasRole("DOCTOR") || hasRole("CLINIC_ADMIN") || hasRole("SUPER_ADMIN")) &&
+    hasPermission("CONSULTATION_START");
+
   const canConfirmAppointment =
     selectedAppointment?.status === "SCHEDULED" && canUpdateAppointments;
 
   const canCheckInAppointment =
     selectedAppointment?.status === "CONFIRMED" && canUpdateAppointments;
-
-  const canStartConsultation =
-    selectedAppointment?.status === "CHECKED_IN" && canUpdateAppointments;
 
   const canCancelAppointment =
     ["SCHEDULED", "CONFIRMED", "CHECKED_IN"].includes(
@@ -850,10 +851,11 @@ export function AppointmentsPage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setShowRegistration(true)}
-          className="
+        {canCreateAppointments && (
+          <button
+            type="button"
+            onClick={() => setShowRegistration(true)}
+            className="
             inline-flex
             h-10
             items-center
@@ -873,9 +875,10 @@ export function AppointmentsPage() {
             focus:ring-teal-500/20
           "
         >
-          <Plus size={17} />
-          New appointment
-        </button>
+            <Plus size={17} />
+            New appointment
+          </button>
+        )}
       </div>
 
       {/* Search / Filters */}
@@ -1319,16 +1322,18 @@ export function AppointmentsPage() {
       </section>
 
       {/* Registration modal */}
-      <AppointmentRegistrationModal
-        open={showRegistration}
-        patients={patients}
-        doctors={doctors}
-        onClose={() => setShowRegistration(false)}
-        onCreated={async () => {
-          setShowRegistration(false);
-          await loadAppointments();
-        }}
-      />
+      {canCreateAppointments && (
+        <AppointmentRegistrationModal
+          open={showRegistration}
+          patients={patients}
+          doctors={doctors}
+          onClose={() => setShowRegistration(false)}
+          onCreated={async () => {
+            setShowRegistration(false);
+            await loadAppointments();
+          }}
+        />
+      )}
 
       {/* Appointment details modal */}
       <AppointmentDetailsModal
@@ -1348,6 +1353,7 @@ export function AppointmentsPage() {
         }}
         onStartConsultation={handleStartConsultation}
         onContinueConsultation={handleContinueConsultation}
+        canStartConsultation={canStartConsultationRole}
         canViewCompletedConsultation={canViewCompletedConsultation}
         onViewConsultation={handleViewConsultation}
       />

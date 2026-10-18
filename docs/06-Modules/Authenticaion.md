@@ -8,7 +8,7 @@
 
 # Purpose
 
-The Authentication module is responsible for verifying user identity, establishing authenticated sessions, and protecting access to Clinexa resources.
+The Authentication module is responsible for verifying user identity, establishing authenticated sessions, and protecting access to SamaRoot resources.
 
 It provides secure authentication and integrates with the authorization (RBAC) and multi-tenancy architecture.
 

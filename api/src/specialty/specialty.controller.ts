@@ -14,6 +14,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 
 import { SpecialtyService } from './specialty.service';
 import { SpecialtyQueryDto } from './dto/specialty-query.dto';
@@ -21,7 +22,7 @@ import { SpecialtyQueryDto } from './dto/specialty-query.dto';
 @ApiTags('Specialties')
 @ApiBearerAuth()
 @Controller('specialties')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class SpecialtyController {
   constructor(private readonly specialtiesService: SpecialtyService) {}
 

@@ -3,5 +3,7 @@ export interface AuthenticatedUser {
   clinicId: string;
   email: string;
   status: string;
+  isPlatformAdmin?: boolean;
   roles: string[];
+  roleCodes?: string[];
 }

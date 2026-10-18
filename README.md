@@ -1,4 +1,4 @@
-# clinexa
+# samaroot
 
 Clinic Management System
 
@@ -10,7 +10,7 @@ npx prisma migrate dev --name role-improvements
 npx primsa studio
 
 {
-"email": "admin@clinexa.com",
+"email": "admin@samaroot.com",
 "password": "Admin@123"
 }
 npx prisma db seed

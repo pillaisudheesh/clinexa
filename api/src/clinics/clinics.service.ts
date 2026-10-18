@@ -15,6 +15,10 @@ import { ClinicSortField } from './enums/clinic-sort-field.enum';
 import { ClinicQueryDto } from './dto/clinic-query.dto';
 import { UpdateClinicDto } from './dto/update-clinic.dto';
 import { UpdateClinicStatusDto } from './dto/update-clinic-status.dto';
+import { provisionClinicMasterData } from './clinic-master-data';
+import { systemRoles } from '../../prisma/data/roles';
+import { assignDefaultRolePermissions } from '../roles/default-role-permissions';
+import { seedLabTests } from '../../prisma/seeds/lab-test.seed';
 
 @Injectable()
 export class ClinicsService {
@@ -28,17 +32,60 @@ export class ClinicsService {
     });
   }
 
-  async create(dto: CreateClinicDto): Promise<ClinicResponseDto> {
-    const existingClinic = await this.findByCode(dto.code);
+  private async generateClinicCode(): Promise<string> {
+    // PostgreSQL sequences are atomic, so concurrent clinic creations cannot
+    // receive the same number. The unique constraint on Clinic.code remains
+    // the final safeguard against duplicate codes.
+    const result = await this.prisma.$queryRaw<{ value: bigint }[]>`
+      SELECT nextval('clinic_code_seq') AS value
+    `;
+    const sequenceValue = result[0]?.value;
 
-    if (existingClinic) {
-      throw new ConflictException('Clinic code already exists.');
+    if (sequenceValue === undefined) {
+      throw new Error('Unable to generate a clinic code.');
     }
 
-    const clinic = await this.prisma.clinic.create({
-      data: {
-        ...dto,
-      },
+    return `CLN-${sequenceValue.toString().padStart(6, '0')}`;
+  }
+
+  async create(dto: CreateClinicDto): Promise<ClinicResponseDto> {
+    const code = await this.generateClinicCode();
+    const clinic = await this.prisma.$transaction(async (tx) => {
+      const createdClinic = await tx.clinic.create({
+        data: {
+          ...dto,
+          code,
+        },
+      });
+
+      // Persist default clinic operating hours at creation time.
+      await tx.clinicWorkingHours.create({
+        data: { clinicId: createdClinic.id },
+      });
+
+      // Create the clinic's standard roles before assigning their permissions.
+      await tx.role.createMany({
+        data: systemRoles.map((role) => ({
+          clinicId: createdClinic.id,
+          code: role.code,
+          name: role.name,
+          description: role.description,
+          displayOrder: role.displayOrder,
+          isSystem: true,
+          isActive: true,
+        })),
+        skipDuplicates: true,
+      });
+
+      // Assign least-privilege default permissions to each clinic role.
+      await assignDefaultRolePermissions(tx, createdClinic.id);
+
+      // Provision clinic-scoped departments and specialties atomically with
+      // clinic creation so the doctor Primary Specialty dropdown is populated.
+      await provisionClinicMasterData(tx, createdClinic.id);
+      await seedLabTests(tx, createdClinic.id);
+
+      return createdClinic;
     });
 
     return ClinicMapper.toResponseDto(clinic);
@@ -138,17 +185,6 @@ export class ClinicsService {
   async update(id: string, dto: UpdateClinicDto): Promise<ClinicResponseDto> {
     await this.findById(id);
 
-    if (dto.code) {
-      const existing = await this.prisma.clinic.findUnique({
-        where: {
-          code: dto.code,
-        },
-      });
-
-      if (existing && existing.id !== id) {
-        throw new ConflictException('Clinic code already exists');
-      }
-    }
     if (dto.email) {
       const existing = await this.prisma.clinic.findFirst({
         where: {
@@ -166,7 +202,6 @@ export class ClinicsService {
 
     const updateData: Prisma.ClinicUpdateInput = {};
 
-    if (dto.code !== undefined) updateData.code = dto.code;
     if (dto.name !== undefined) updateData.name = dto.name;
     if (dto.email !== undefined) updateData.email = dto.email;
     if (dto.phone !== undefined) updateData.phone = dto.phone;

@@ -1,0 +1,1 @@
+ALTER TABLE "Clinic" ADD COLUMN "logoUrl" TEXT, ADD COLUMN "tagline" TEXT, ADD COLUMN "brandColor" TEXT DEFAULT '#0F766E';

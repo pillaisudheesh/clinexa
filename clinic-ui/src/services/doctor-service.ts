@@ -40,10 +40,7 @@ export const doctorService = {
     id: string,
     data: UpdateDoctorStatusRequest,
   ): Promise<Doctor> {
-    const response = await apiClient.patch<Doctor>(
-      `/doctors/${id}/status`,
-      data,
-    );
+    const response = await apiClient.put<Doctor>(`/doctors/${id}/status`, data);
 
     return response.data;
   },

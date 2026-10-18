@@ -1,7 +1,7 @@
-# Clinexa Security Architecture
+# SamaRoot Security Architecture
 
 **Document Version:** 1.0 (Draft)
-**Product:** Clinexa
+**Product:** SamaRoot
 **Classification:** Internal
 
 ---
@@ -33,7 +33,7 @@
 
 # 1. Purpose
 
-This document defines the security architecture and policies for the Clinexa platform.
+This document defines the security architecture and policies for the SamaRoot platform.
 
 It establishes the baseline security requirements that all application components must follow to protect patient information, clinic data, and platform resources.
 
@@ -43,7 +43,7 @@ Security is considered a core architectural concern and must be incorporated thr
 
 # 2. Security Objectives
 
-Clinexa is designed to:
+SamaRoot is designed to:
 
 * Protect patient confidentiality.
 * Ensure data integrity.
@@ -122,7 +122,7 @@ JWT claims should include:
 
 # 5. Authorization
 
-Clinexa uses Role-Based Access Control (RBAC).
+SamaRoot uses Role-Based Access Control (RBAC).
 
 Authorization decisions are based on:
 
@@ -210,7 +210,7 @@ Sensitive endpoints should implement additional controls such as stricter rate l
 
 # 10. Data Protection
 
-Clinexa stores sensitive healthcare information.
+SamaRoot stores sensitive healthcare information.
 
 The platform must:
 
@@ -395,7 +395,7 @@ Incident records should be retained for future analysis.
 
 # 20. Future Security Enhancements
 
-Future versions of Clinexa may include:
+Future versions of SamaRoot may include:
 
 * Multi-Factor Authentication (MFA)
 * Single Sign-On (OIDC/SAML)
@@ -410,7 +410,7 @@ Future versions of Clinexa may include:
 
 # Security Principles Summary
 
-Every component of Clinexa must uphold the following principles:
+Every component of SamaRoot must uphold the following principles:
 
 * Authenticate every user.
 * Authorize every request.
@@ -420,4 +420,4 @@ Every component of Clinexa must uphold the following principles:
 * Protect patient privacy by minimizing data exposure.
 * Design systems assuming failures and attacks are possible.
 
-> **Security is not a feature added to Clinexa—it is a foundational property of the platform, embedded into every layer of the application to protect patient data, clinic operations, and the trust placed in the system.**
+> **Security is not a feature added to SamaRoot—it is a foundational property of the platform, embedded into every layer of the application to protect patient data, clinic operations, and the trust placed in the system.**

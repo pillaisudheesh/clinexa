@@ -642,27 +642,40 @@ export class DispensingService {
       // -----------------------------------------------------------------------
 
       if (dispensing.invoiceId) {
-        const invoice = await tx.invoice.findFirst({
+        await tx.invoiceItem.deleteMany({
           where: {
-            id: dispensing.invoiceId,
-            clinicId,
-          },
-          select: {
-            id: true,
-            status: true,
+            invoiceId: dispensing.invoiceId,
+            pharmacyDispensingItemId: {
+              in: dispensing.items.map((item) => item.id),
+            },
           },
         });
 
-        if (!invoice) {
-          throw new NotFoundException(
-            'Invoice associated with dispensing was not found',
-          );
-        }
+        // ---------------------------------------------------------------------
+        // Recalculate invoice
+        // ---------------------------------------------------------------------
 
-        if (invoice.status !== 'DRAFT') {
-          throw new BadRequestException(
-            'Dispensing cannot be cancelled after the invoice has been issued',
-          );
+        await this.recalculateInvoice(tx, dispensing.invoiceId);
+
+        // ---------------------------------------------------------------------
+        // Cancel invoice when no charges remain
+        // ---------------------------------------------------------------------
+
+        const remainingInvoiceItems = await tx.invoiceItem.count({
+          where: {
+            invoiceId: dispensing.invoiceId,
+          },
+        });
+
+        if (remainingInvoiceItems === 0) {
+          await tx.invoice.update({
+            where: {
+              id: dispensing.invoiceId,
+            },
+            data: {
+              status: InvoiceStatus.CANCELLED,
+            },
+          });
         }
       }
 

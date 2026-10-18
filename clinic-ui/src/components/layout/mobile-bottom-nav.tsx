@@ -50,8 +50,8 @@ export function MobileBottomNav({ onMoreClick }: MobileBottomNavProps) {
                 cn(
                   "flex flex-col items-center justify-center gap-1 transition-colors",
                   isActive
-                    ? "text-clinexa-700"
-                    : "text-slate-500 hover:text-clinexa-700",
+                    ? "text-samaroot-700"
+                    : "text-slate-500 hover:text-samaroot-700",
                 )
               }
             >

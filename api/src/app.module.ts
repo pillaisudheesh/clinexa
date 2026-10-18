@@ -34,6 +34,9 @@ import { QualificationModule } from './qualification/qualification.module';
 import { LanguageModule } from './language/language.module';
 import { RegistrationCouncilModule } from './registration-council/registration-council.module';
 import { BillingModule } from './billing/billing.module';
+import { ReportsModule } from './reports/reports.module';
+import { ClinicSettingsModule } from './clinic-settings/clinic-settings.module';
+import { AuditModule } from './audit/audit.module';
 
 @Module({
   imports: [
@@ -70,6 +73,9 @@ import { BillingModule } from './billing/billing.module';
     LanguageModule,
     RegistrationCouncilModule,
     BillingModule,
+    ReportsModule,
+    ClinicSettingsModule,
+    AuditModule,
   ],
   controllers: [AppController],
   providers: [AppService],

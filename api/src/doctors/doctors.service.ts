@@ -7,6 +7,7 @@ import {
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 
 import { CreateDoctorDto } from './dto/create-doctor.dto';
 import { DoctorQueryDto } from './dto/doctor-query.dto';
@@ -20,7 +21,10 @@ import { DoctorMapper } from './doctor.mapper';
 
 @Injectable()
 export class DoctorsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   // ===========================================================================
   // CREATE
@@ -29,6 +33,7 @@ export class DoctorsService {
   async create(
     clinicId: string,
     dto: CreateDoctorDto,
+    actorId: string,
   ): Promise<DoctorResponseDto> {
     await this.validateReferences(clinicId, dto);
 
@@ -75,6 +80,101 @@ export class DoctorsService {
           },
         });
 
+        // Store the standard and optional consultation fees with the doctor.
+        await tx.doctorConsultationFee.create({
+          data: {
+            doctorId: createdDoctor.id,
+            consultationFee: new Prisma.Decimal(dto.consultationFee),
+            followUpFee:
+              dto.followUpFee != null
+                ? new Prisma.Decimal(dto.followUpFee)
+                : null,
+            emergencyFee:
+              dto.emergencyFee != null
+                ? new Prisma.Decimal(dto.emergencyFee)
+                : null,
+            teleConsultationFee:
+              dto.teleConsultationFee != null
+                ? new Prisma.Decimal(dto.teleConsultationFee)
+                : null,
+          },
+        });
+
+        // Create a schedule when the registration form supplies availability.
+        const scheduleDays = dto.scheduleDays ?? [];
+        if (scheduleDays.length > 0) {
+          const startTime = dto.scheduleStartTime ?? '09:00';
+          const endTime = dto.scheduleEndTime ?? '17:00';
+          const toMinutes = (value: string) => {
+            const match = /^(\d{2}):(\d{2})$/.exec(value);
+            if (!match)
+              throw new BadRequestException(
+                'Schedule times must use HH:mm format.',
+              );
+            const hours = Number(match[1]);
+            const minutes = Number(match[2]);
+            if (hours > 23 || minutes > 59)
+              throw new BadRequestException('Invalid schedule time.');
+            return hours * 60 + minutes;
+          };
+          if (toMinutes(endTime) <= toMinutes(startTime)) {
+            throw new BadRequestException(
+              'Doctor schedule end time must be after start time.',
+            );
+          }
+          const clinicHours = await tx.clinicWorkingHours.findUnique({
+            where: { clinicId },
+          });
+          if (
+            clinicHours &&
+            (toMinutes(startTime) < toMinutes(clinicHours.openingTime) ||
+              toMinutes(endTime) > toMinutes(clinicHours.closingTime))
+          ) {
+            throw new BadRequestException(
+              'Doctor schedule must fit within clinic working hours.',
+            );
+          }
+          if (clinicHours) {
+            const clinicDayNumbers: Record<string, number> = {
+              SUNDAY: 0,
+              MONDAY: 1,
+              TUESDAY: 2,
+              WEDNESDAY: 3,
+              THURSDAY: 4,
+              FRIDAY: 5,
+              SATURDAY: 6,
+            };
+            const allowedDays = new Set(
+              clinicHours.workingDays
+                .split(',')
+                .map((day) => clinicDayNumbers[day.trim().toUpperCase()])
+                .filter((day) => day !== undefined),
+            );
+            if (
+              [...new Set(scheduleDays)].some((day) => !allowedDays.has(day))
+            ) {
+              throw new BadRequestException(
+                'Doctor working days must be within the clinic working days.',
+              );
+            }
+          }
+          const schedule = await tx.doctorSchedule.create({
+            data: {
+              doctorId: createdDoctor.id,
+              slotDuration: dto.slotDuration ?? 30,
+              slots: {
+                create: [...new Set(scheduleDays)].map((dayOfWeek) => ({
+                  dayOfWeek,
+                  startTime,
+                  endTime,
+                  isAvailable: true,
+                })),
+              },
+            },
+          });
+          void schedule;
+        }
+
         const specialtyIds = new Set<string>();
 
         specialtyIds.add(dto.primarySpecialtyId);
@@ -119,8 +219,16 @@ export class DoctorsService {
         });
       });
 
-      // IMPORTANT:
-      // Convert Prisma entity -> API DTO
+      await this.auditService.create({
+        clinicId,
+        actorId,
+        action: 'CREATE',
+        entityType: 'Doctor',
+        entityId: doctor.id,
+        description: 'Doctor created',
+        metadata: { doctorNumber: doctor.doctorNumber },
+      });
+
       return DoctorMapper.toResponse(doctor);
     } catch (error) {
       this.handlePrismaError(
@@ -276,6 +384,7 @@ export class DoctorsService {
     clinicId: string,
     id: string,
     dto: UpdateDoctorDto,
+    actorId: string,
   ): Promise<DoctorResponseDto> {
     const existingDoctor = await this.prisma.doctor.findFirst({
       where: {
@@ -363,6 +472,49 @@ export class DoctorsService {
             }),
           },
         });
+
+        if (dto.consultationFee !== undefined) {
+          await tx.doctorConsultationFee.upsert({
+            where: { doctorId: id },
+            create: {
+              doctorId: id,
+              consultationFee: new Prisma.Decimal(dto.consultationFee),
+              followUpFee:
+                dto.followUpFee != null
+                  ? new Prisma.Decimal(dto.followUpFee)
+                  : null,
+              emergencyFee:
+                dto.emergencyFee != null
+                  ? new Prisma.Decimal(dto.emergencyFee)
+                  : null,
+              teleConsultationFee:
+                dto.teleConsultationFee != null
+                  ? new Prisma.Decimal(dto.teleConsultationFee)
+                  : null,
+            },
+            update: {
+              consultationFee: new Prisma.Decimal(dto.consultationFee),
+              ...(dto.followUpFee !== undefined && {
+                followUpFee:
+                  dto.followUpFee == null
+                    ? null
+                    : new Prisma.Decimal(dto.followUpFee),
+              }),
+              ...(dto.emergencyFee !== undefined && {
+                emergencyFee:
+                  dto.emergencyFee == null
+                    ? null
+                    : new Prisma.Decimal(dto.emergencyFee),
+              }),
+              ...(dto.teleConsultationFee !== undefined && {
+                teleConsultationFee:
+                  dto.teleConsultationFee == null
+                    ? null
+                    : new Prisma.Decimal(dto.teleConsultationFee),
+              }),
+            },
+          });
+        }
 
         // ---------------------------------------------------------------
         // Specialties
@@ -454,6 +606,16 @@ export class DoctorsService {
         });
       });
 
+      await this.auditService.create({
+        clinicId,
+        actorId,
+        action: 'UPDATE',
+        entityType: 'Doctor',
+        entityId: doctor.id,
+        description: 'Doctor updated',
+        metadata: { doctorNumber: doctor.doctorNumber },
+      });
+
       return DoctorMapper.toResponse(doctor);
     } catch (error) {
       this.handlePrismaError(
@@ -471,6 +633,7 @@ export class DoctorsService {
     clinicId: string,
     id: string,
     dto: UpdateDoctorStatusDto,
+    actorId: string,
   ): Promise<DoctorResponseDto> {
     const existingDoctor = await this.prisma.doctor.findFirst({
       where: {
@@ -483,17 +646,25 @@ export class DoctorsService {
       throw new NotFoundException('Doctor not found.');
     }
 
+    const statusChanged = existingDoctor.isActive !== dto.isActive;
+
     const doctor = await this.prisma.doctor.update({
-      where: {
-        id,
-      },
-
-      data: {
-        isActive: dto.isActive,
-      },
-
+      where: { id },
+      data: { isActive: dto.isActive },
       include: doctorInclude,
     });
+
+    if (statusChanged) {
+      await this.auditService.create({
+        clinicId,
+        actorId,
+        action: dto.isActive ? 'ACTIVATE' : 'DEACTIVATE',
+        entityType: 'Doctor',
+        entityId: doctor.id,
+        description: dto.isActive ? 'Doctor activated' : 'Doctor deactivated',
+        metadata: { doctorNumber: doctor.doctorNumber },
+      });
+    }
 
     return DoctorMapper.toResponse(doctor);
   }
@@ -502,7 +673,7 @@ export class DoctorsService {
   // DELETE / SOFT DELETE
   // ===========================================================================
 
-  async remove(clinicId: string, id: string) {
+  async remove(clinicId: string, id: string, actorId: string) {
     const existingDoctor = await this.prisma.doctor.findFirst({
       where: {
         id,
@@ -514,19 +685,24 @@ export class DoctorsService {
       throw new NotFoundException('Doctor not found.');
     }
 
-    await this.prisma.doctor.update({
-      where: {
-        id,
-      },
+    if (existingDoctor.isActive) {
+      await this.prisma.doctor.update({
+        where: { id },
+        data: { isActive: false },
+      });
 
-      data: {
-        isActive: false,
-      },
-    });
+      await this.auditService.create({
+        clinicId,
+        actorId,
+        action: 'DEACTIVATE',
+        entityType: 'Doctor',
+        entityId: existingDoctor.id,
+        description: 'Doctor deactivated',
+        metadata: { doctorNumber: existingDoctor.doctorNumber },
+      });
+    }
 
-    return {
-      message: 'Doctor deactivated successfully.',
-    };
+    return { message: 'Doctor deactivated successfully.' };
   }
 
   // ===========================================================================

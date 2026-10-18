@@ -8,6 +8,7 @@ import {
 import { InventoryTransactionType, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 
 import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
 
@@ -26,7 +27,10 @@ import { StockReceiptQueryDto } from './dto/stock-receipt-query.dto';
 
 @Injectable()
 export class InventoryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   // ===========================================================================
   // CREATE BATCH
@@ -35,6 +39,7 @@ export class InventoryService {
   async createBatch(
     clinicId: string,
     dto: CreateMedicineBatchDto,
+    actorId: string,
   ): Promise<MedicineBatchResponseDto> {
     const medicine = await this.prisma.medicine.findFirst({
       where: {
@@ -123,6 +128,21 @@ export class InventoryService {
           newQuantity: dto.quantity,
 
           notes: dto.notes,
+        },
+      });
+
+      await this.auditService.createInTransaction(tx, {
+        clinicId,
+        actorId,
+        action: 'MEDICINE_BATCH_CREATED',
+        entityType: 'MedicineBatch',
+        entityId: created.id,
+        description: 'Medicine batch created and initial stock recorded',
+        metadata: {
+          medicineId: created.medicineId,
+          batchNumber: created.batchNumber,
+          quantity: created.quantity,
+          expiryDate: created.expiryDate.toISOString(),
         },
       });
 
@@ -284,6 +304,7 @@ export class InventoryService {
     clinicId: string,
     id: string,
     dto: AdjustStockDto,
+    actorId: string,
   ): Promise<MedicineBatchResponseDto> {
     if (dto.quantity === 0) {
       throw new BadRequestException('Stock adjustment quantity cannot be zero');
@@ -357,6 +378,22 @@ export class InventoryService {
           newQuantity,
 
           notes: dto.notes,
+        },
+      });
+
+      await this.auditService.createInTransaction(tx, {
+        clinicId,
+        actorId,
+        action: 'INVENTORY_STOCK_ADJUSTED',
+        entityType: 'MedicineBatch',
+        entityId: batch.id,
+        description: 'Inventory batch stock quantity adjusted',
+        metadata: {
+          adjustment: dto.quantity,
+          previousQuantity,
+          newQuantity,
+          transactionType,
+          notes: dto.notes ?? null,
         },
       });
 
@@ -619,6 +656,7 @@ export class InventoryService {
   async markExpired(
     clinicId: string,
     id: string,
+    actorId: string,
   ): Promise<MedicineBatchResponseDto> {
     return this.prisma.$transaction(async (tx) => {
       const batch = await tx.medicineBatch.findFirst({
@@ -690,6 +728,21 @@ export class InventoryService {
           referenceId: batch.id,
 
           notes: `Batch ${batch.batchNumber} marked as expired`,
+        },
+      });
+
+      await this.auditService.createInTransaction(tx, {
+        clinicId,
+        actorId,
+        action: 'INVENTORY_STOCK_EXPIRED',
+        entityType: 'MedicineBatch',
+        entityId: batch.id,
+        description: 'Expired batch removed from available inventory',
+        metadata: {
+          batchNumber: batch.batchNumber,
+          previousQuantity,
+          newQuantity: 0,
+          expiryDate: batch.expiryDate.toISOString(),
         },
       });
 
@@ -875,6 +928,7 @@ export class InventoryService {
   async createStockReceipt(
     clinicId: string,
     dto: CreateStockReceiptDto,
+    actorId: string,
   ): Promise<StockReceiptResponseDto> {
     if (!dto.items.length) {
       throw new BadRequestException('At least one medicine is required');
@@ -1052,6 +1106,22 @@ export class InventoryService {
             if (!result) {
               throw new NotFoundException('Stock receipt not found');
             }
+
+            await this.auditService.createInTransaction(tx, {
+              clinicId,
+              actorId,
+              action: 'INVENTORY_STOCK_RECEIVED',
+              entityType: 'StockReceipt',
+              entityId: receipt.id,
+              description:
+                'Stock receipt created and inventory quantities updated',
+              metadata: {
+                receiptNumber,
+                itemCount: dto.items.length,
+                totalAmount: totalAmount.toString(),
+                supplierInvoiceNumber: dto.supplierInvoiceNumber ?? null,
+              },
+            });
 
             return this.mapStockReceipt(result);
           },

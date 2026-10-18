@@ -3,6 +3,7 @@ import {
   AppointmentStatus,
   InvoiceStatus,
   LabOrderStatus,
+  PaymentStatus,
 } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
@@ -30,7 +31,10 @@ export class DashboardService {
       todayAppointments,
       recentPatients,
       pendingLabOrders,
+      lowStockRows,
       revenue,
+      outstandingBilling,
+      recentActivitySources,
     ] = await Promise.all([
       can(PermissionCodes.PATIENT_READ)
         ? this.prisma.patient.count({
@@ -129,20 +133,183 @@ export class DashboardService {
           })
         : null,
 
+      can(PermissionCodes.INVENTORY_READ)
+        ? this.prisma.medicineBatch.findMany({
+            where: {
+              clinicId,
+              isActive: true,
+            },
+            select: {
+              quantity: true,
+              reorderLevel: true,
+            },
+          })
+        : null,
+
+      can(PermissionCodes.BILLING_READ)
+        ? this.prisma.payment.aggregate({
+            where: {
+              invoice: {
+                clinicId,
+              },
+              status: PaymentStatus.SUCCESS,
+              paidAt: {
+                gte: startOfToday,
+                lt: startOfTomorrow,
+              },
+            },
+            _sum: {
+              amount: true,
+            },
+          })
+        : null,
+
       can(PermissionCodes.BILLING_READ)
         ? this.prisma.invoice.aggregate({
             where: {
               clinicId,
               status: {
-                notIn: [InvoiceStatus.CANCELLED, InvoiceStatus.REFUNDED],
+                in: [
+                  InvoiceStatus.ISSUED,
+                  InvoiceStatus.PARTIALLY_PAID,
+                ],
+              },
+              balanceDue: {
+                gt: 0,
               },
             },
             _sum: {
-              amountPaid: true,
+              balanceDue: true,
+            },
+            _count: {
+              _all: true,
             },
           })
         : null,
+
+      Promise.all([
+        can(PermissionCodes.PATIENT_READ)
+          ? this.prisma.patient.findMany({
+              where: { clinicId },
+              orderBy: { createdAt: 'desc' },
+              take: 4,
+              select: {
+                id: true,
+                patientNumber: true,
+                firstName: true,
+                lastName: true,
+                createdAt: true,
+              },
+            })
+          : [],
+        can(PermissionCodes.APPOINTMENT_READ)
+          ? this.prisma.appointment.findMany({
+              where: { clinicId },
+              orderBy: { createdAt: 'desc' },
+              take: 4,
+              select: {
+                id: true,
+                appointmentNumber: true,
+                status: true,
+                createdAt: true,
+                patient: { select: { firstName: true, lastName: true } },
+              },
+            })
+          : [],
+        can(PermissionCodes.BILLING_READ)
+          ? this.prisma.payment.findMany({
+              where: {
+                invoice: { clinicId },
+                status: PaymentStatus.SUCCESS,
+              },
+              orderBy: { paidAt: 'desc' },
+              take: 4,
+              select: {
+                id: true,
+                amount: true,
+                paidAt: true,
+                invoice: {
+                  select: {
+                    invoiceNumber: true,
+                    patient: { select: { firstName: true, lastName: true } },
+                  },
+                },
+              },
+            })
+          : [],
+        can(PermissionCodes.LAB_READ)
+          ? this.prisma.labOrder.findMany({
+              where: { clinicId },
+              orderBy: { createdAt: 'desc' },
+              take: 4,
+              select: {
+                id: true,
+                status: true,
+                createdAt: true,
+                patient: { select: { firstName: true, lastName: true } },
+              },
+            })
+          : [],
+        can(PermissionCodes.INVENTORY_READ)
+          ? this.prisma.inventoryTransaction.findMany({
+              where: { clinicId },
+              orderBy: { createdAt: 'desc' },
+              take: 4,
+              select: {
+                id: true,
+                type: true,
+                quantity: true,
+                createdAt: true,
+                medicineBatch: {
+                  select: { medicine: { select: { name: true } } },
+                },
+              },
+            })
+          : [],
+      ]),
     ]);
+
+    const [activityPatients, activityAppointments, activityPayments, activityLabs, activityInventory] = recentActivitySources;
+
+    const recentActivity = [
+      ...activityPatients.map((item) => ({
+        id: `patient-${item.id}`,
+        type: 'PATIENT',
+        title: 'New patient registered',
+        description: `${item.firstName} ${item.lastName} · ${item.patientNumber}`,
+        createdAt: item.createdAt,
+      })),
+      ...activityAppointments.map((item) => ({
+        id: `appointment-${item.id}`,
+        type: 'APPOINTMENT',
+        title: 'Appointment updated',
+        description: `${item.patient.firstName} ${item.patient.lastName} · ${item.appointmentNumber} · ${item.status.replaceAll('_', ' ')}`,
+        createdAt: item.createdAt,
+      })),
+      ...activityPayments.map((item) => ({
+        id: `payment-${item.id}`,
+        type: 'PAYMENT',
+        title: 'Payment received',
+        description: `${item.invoice.patient.firstName} ${item.invoice.patient.lastName} · ${item.invoice.invoiceNumber} · ₹${Number(item.amount).toFixed(0)}`,
+        createdAt: item.paidAt,
+      })),
+      ...activityLabs.map((item) => ({
+        id: `lab-${item.id}`,
+        type: 'LAB',
+        title: 'Lab order created',
+        description: `${item.patient.firstName} ${item.patient.lastName} · ${item.status.replaceAll('_', ' ')}`,
+        createdAt: item.createdAt,
+      })),
+      ...activityInventory.map((item) => ({
+        id: `inventory-${item.id}`,
+        type: 'INVENTORY',
+        title: 'Inventory activity',
+        description: `${item.medicineBatch.medicine.name} · ${item.type.replaceAll('_', ' ')} · ${item.quantity}`,
+        createdAt: item.createdAt,
+      })),
+    ]
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, 8);
 
     const appointmentStatusCounts = can(PermissionCodes.APPOINTMENT_READ)
       ? await this.prisma.appointment.groupBy({
@@ -170,11 +337,22 @@ export class DashboardService {
           ? todayAppointments.length
           : null,
         pendingLabOrders,
-        collectedRevenue: revenue?._sum.amountPaid
-          ? Number(revenue._sum.amountPaid)
+        lowStockBatches: lowStockRows
+          ? lowStockRows.filter(
+              (batch) => batch.quantity <= batch.reorderLevel,
+            ).length
+          : null,
+        collectedRevenue: revenue?._sum.amount
+          ? Number(revenue._sum.amount)
           : revenue
             ? 0
             : null,
+        outstandingBillingAmount: outstandingBilling?._sum.balanceDue
+          ? Number(outstandingBilling._sum.balanceDue)
+          : outstandingBilling
+            ? 0
+            : null,
+        outstandingBillingInvoices: outstandingBilling?._count._all ?? null,
       },
 
       appointmentStatus: appointmentStatusCounts.map((item) => ({
@@ -202,6 +380,11 @@ export class DashboardService {
         },
       })),
 
+      recentActivity: recentActivity.map((item) => ({
+        ...item,
+        createdAt: item.createdAt.toISOString(),
+      })),
+
       recentPatients: recentPatients.map((patient) => ({
         id: patient.id,
         patientNumber: patient.patientNumber,
@@ -215,6 +398,7 @@ export class DashboardService {
         appointments: can(PermissionCodes.APPOINTMENT_READ),
         doctors: can(PermissionCodes.DOCTOR_READ),
         laboratory: can(PermissionCodes.LAB_READ),
+        inventory: can(PermissionCodes.INVENTORY_READ),
         billing: can(PermissionCodes.BILLING_READ),
         reports: can(PermissionCodes.REPORT_READ),
       },

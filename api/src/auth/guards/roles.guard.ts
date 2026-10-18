@@ -30,9 +30,41 @@ export class RolesGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
 
-    const hasRole = requiredRoles.some((role) =>
-      request.user.roles.includes(role),
+    // Platform-wide authorization is independent of clinic role names.
+    // A database-verified platform administrator may access platform-level
+    // endpoints even if they do not also hold a clinic SUPER_ADMIN role.
+    if (request.user.isPlatformAdmin === true) {
+      return true;
+    }
+
+    const assignedRoles = request.user.roles ?? [];
+    const assignedRoleCodes = request.user.roleCodes ?? [];
+
+    // Role names are user-facing labels (for example, "Super Administrator"),
+    // while route decorators use stable role codes (for example, "SUPER_ADMIN").
+    // Normalize both forms and explicitly support legacy display names so that
+    // role-protected endpoints work with existing users and newly seeded roles.
+    const normalizeRole = (value: string) =>
+      value.trim().toUpperCase().replace(/[\s-]+/g, '_');
+
+    const roleAliases: Record<string, string[]> = {
+      SUPER_ADMIN: ['SUPER_ADMINISTRATOR'],
+      CLINIC_ADMIN: ['CLINIC_ADMINISTRATOR'],
+    };
+
+    const assignedRoleValues = [...assignedRoles, ...assignedRoleCodes].map(
+      normalizeRole,
     );
+
+    const hasRole = requiredRoles.some((requiredRole) => {
+      const normalizedRequiredRole = normalizeRole(requiredRole);
+      const acceptedValues = [
+        normalizedRequiredRole,
+        ...(roleAliases[normalizedRequiredRole] ?? []),
+      ];
+
+      return acceptedValues.some((role) => assignedRoleValues.includes(role));
+    });
 
     if (!hasRole) {
       throw new ForbiddenException(

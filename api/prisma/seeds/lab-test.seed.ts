@@ -1,7 +1,12 @@
 import { PrismaClient } from '@prisma/client';
 import { labTests } from '../data/master/lab-tests';
 
-export async function seedLabTests(prisma: PrismaClient, clinicId: string) {
+type LabTestSeedClient = Pick<PrismaClient, 'labTest'>;
+
+export async function seedLabTests(
+  prisma: LabTestSeedClient,
+  clinicId: string,
+) {
   console.log('Seeding laboratory tests...');
 
   for (const test of labTests) {

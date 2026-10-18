@@ -29,6 +29,7 @@ interface AppointmentDetailsModalProps {
   onContinueConsultation: () => void;
   onViewConsultation: () => void;
   canViewCompletedConsultation?: boolean;
+  canStartConsultation?: boolean;
 }
 
 function formatDate(date: string) {
@@ -159,6 +160,7 @@ export function AppointmentDetailsModal({
   onContinueConsultation,
   onViewConsultation,
   canViewCompletedConsultation,
+  canStartConsultation = false,
 }: AppointmentDetailsModalProps) {
   if (!open) {
     return null;
@@ -674,7 +676,7 @@ export function AppointmentDetailsModal({
                 </button>
               )}
 
-              {appointment?.status === "CHECKED_IN" && (
+              {appointment?.status === "CHECKED_IN" && canStartConsultation && (
                 <button
                   type="button"
                   onClick={onStartConsultation}
@@ -713,7 +715,7 @@ export function AppointmentDetailsModal({
                 </button>
               )}
 
-              {appointment?.status === "IN_CONSULTATION" && (
+              {appointment?.status === "IN_CONSULTATION" && canStartConsultation && (
                 <button
                   type="button"
                   onClick={onContinueConsultation}

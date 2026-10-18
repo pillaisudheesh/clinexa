@@ -2,8 +2,8 @@ import { apiClient } from "./api-client";
 
 import type { LoginRequest, LoginResponse, AuthUser } from "@/types/auth";
 
-const ACCESS_TOKEN_KEY = "clinexa_access_token";
-const USER_KEY = "clinexa_user";
+const ACCESS_TOKEN_KEY = "samaroot_access_token";
+const USER_KEY = "samaroot_user";
 
 export const authService = {
   async login(credentials: LoginRequest): Promise<LoginResponse> {
@@ -31,10 +31,15 @@ export const authService = {
     return user;
   },
 
-  logout() {
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-
-    localStorage.removeItem(USER_KEY);
+  async logout() {
+    try {
+      // Call the backend while the JWT is still available.
+      const response = await apiClient.post<{ user: AuthUser }>("/auth/logout");
+    } finally {
+      // Always clear local credentials, even if the API fails.
+      localStorage.removeItem(ACCESS_TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
+    }
   },
 
   getAccessToken() {

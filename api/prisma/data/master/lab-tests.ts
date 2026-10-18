@@ -1,5 +1,5 @@
 /**
- * Clinexa starter laboratory-test master data.
+ * SamaRoot starter laboratory-test master data.
  *
  * Reference ranges below are DEFAULT ADULT reference/decision values for
  * development and initial configuration. They are NOT universal clinical

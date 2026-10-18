@@ -85,8 +85,9 @@ export class UsersController {
   })
   findAll(
     @Query() query: UserQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<PaginatedResponseDto<UserResponseDto>> {
-    return this.usersService.findAll(query);
+    return this.usersService.findAll(query, user);
   }
 
   // ===========================================================================
@@ -119,8 +120,11 @@ export class UsersController {
     status: 409,
     description: 'User already exists.',
   })
-  create(@Body() dto: CreateUserDto): Promise<UserResponseDto> {
-    return this.usersService.create(dto);
+  create(
+    @Body() dto: CreateUserDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<UserResponseDto> {
+    return this.usersService.create(dto, user);
   }
 
   // ===========================================================================
@@ -156,8 +160,9 @@ export class UsersController {
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateUserDto,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<UserResponseDto> {
-    return this.usersService.update(id, dto);
+    return this.usersService.update(id, dto, user);
   }
 
   // ===========================================================================
@@ -189,7 +194,8 @@ export class UsersController {
   updateStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateUserStatusDto,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<UserResponseDto> {
-    return this.usersService.updateStatus(id, dto);
+    return this.usersService.updateStatus(id, dto, user);
   }
 }

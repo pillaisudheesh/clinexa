@@ -10,12 +10,13 @@ import {
   FileText,
   Loader2,
   PackageCheck,
-  Pill,
+  Store,
   RefreshCw,
   Search,
   UserRound,
   X,
   XCircle,
+  Pill,
 } from "lucide-react";
 import { PageLoader } from "@/components/ui/page-loader";
 import { SectionLoader } from "@/components/ui/section-loader";
@@ -459,7 +460,7 @@ export default function PharmacyPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2 text-sm text-slate-400">
-            <Pill className="size-4 text-teal-500" />
+            <Store className="size-4 text-teal-500" />
             Pharmacy
           </div>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">

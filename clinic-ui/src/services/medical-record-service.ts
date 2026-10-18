@@ -7,7 +7,10 @@ import type {
 } from "@/types/medical-record";
 
 export const medicalRecordService = {
-  async getMedicalRecords(appointmentId?: string): Promise<{
+  async getMedicalRecords(
+    appointmentId?: string,
+    patientId?: string,
+  ): Promise<{
     data: MedicalRecord[];
     meta: {
       page: number;
@@ -18,7 +21,8 @@ export const medicalRecordService = {
   }> {
     const response = await apiClient.get("/medical-records", {
       params: {
-        appointmentId,
+        ...(appointmentId && { appointmentId }),
+        ...(patientId && { patientId }),
       },
     });
 

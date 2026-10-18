@@ -36,7 +36,10 @@ export interface DashboardSummary {
     doctors: number | null;
     todayAppointments: number | null;
     pendingLabOrders: number | null;
+    lowStockBatches: number | null;
     collectedRevenue: number | null;
+    outstandingBillingAmount: number | null;
+    outstandingBillingInvoices: number | null;
   };
 
   appointmentStatus: {
@@ -46,6 +49,14 @@ export interface DashboardSummary {
 
   todayAppointments: DashboardAppointment[];
 
+  recentActivity: {
+    id: string;
+    type: string;
+    title: string;
+    description: string;
+    createdAt: string;
+  }[];
+
   recentPatients: DashboardPatient[];
 
   permissions: {
@@ -53,6 +64,7 @@ export interface DashboardSummary {
     appointments: boolean;
     doctors: boolean;
     laboratory: boolean;
+    inventory: boolean;
     billing: boolean;
     reports: boolean;
   };

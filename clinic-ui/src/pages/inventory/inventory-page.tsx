@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Package,
+  Pencil,
   Plus,
   RefreshCw,
   Search,
@@ -57,9 +58,10 @@ function money(value: number) {
 }
 
 function transactionLabel(type: InventoryTransaction["type"]) {
-  return type.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) =>
-    letter.toUpperCase(),
-  );
+  return type
+    .replaceAll("_", " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function transactionTone(type: InventoryTransaction["type"]) {
@@ -68,65 +70,6 @@ function transactionTone(type: InventoryTransaction["type"]) {
   }
   if (type === "RETURN") return "bg-sky-50 text-sky-700 ring-sky-100";
   return "bg-emerald-50 text-emerald-700 ring-emerald-100";
-}
-
-function CustomSelect({
-  value,
-  onChange,
-  options,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  options: Array<{ value: string; label: string }>;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const selected = options.find((option) => option.value === value);
-
-  useEffect(() => {
-    const close = (event: PointerEvent) => {
-      if (ref.current && !ref.current.contains(event.target as Node))
-        setOpen(false);
-    };
-    document.addEventListener("pointerdown", close);
-    return () => document.removeEventListener("pointerdown", close);
-  }, []);
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((current) => !current)}
-        className="flex h-10 w-full items-center justify-between rounded-xl bg-white px-3.5 text-left text-sm text-slate-600 outline-none ring-1 ring-slate-200/70 transition focus:ring-2 focus:ring-teal-500/20"
-      >
-        <span className={!selected ? "text-slate-400" : ""}>
-          {selected?.label ?? "Select"}
-        </span>
-        <ChevronDown className="size-4 text-slate-400" />
-      </button>
-      {open && (
-        <div className="absolute inset-x-0 top-full z-30 mt-2 max-h-60 overflow-auto rounded-xl bg-white p-1.5 shadow-xl ring-1 ring-slate-200/70">
-          {options.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => {
-                onChange(option.value);
-                setOpen(false);
-              }}
-              className={`w-full rounded-lg px-3 py-2.5 text-left text-sm transition ${
-                option.value === value
-                  ? "bg-teal-50 font-medium text-teal-700"
-                  : "text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 }
 
 function SummaryCard({
@@ -190,7 +133,9 @@ function StockAlertList({
       <div className="bg-[#f8fcfb] px-5 py-4">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-sm font-semibold text-slate-700">{title}</h2>
-          <span className={`rounded-lg px-2 py-1 text-xs font-semibold ring-1 ${accent}`}>
+          <span
+            className={`rounded-lg px-2 py-1 text-xs font-semibold ring-1 ${accent}`}
+          >
             {batches.length}
           </span>
         </div>
@@ -268,6 +213,14 @@ export function InventoryPage() {
   const [formError, setFormError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const [adjustmentBatch, setAdjustmentBatch] = useState<InventoryBatch | null>(
+    null,
+  );
+  const [adjustmentQuantity, setAdjustmentQuantity] = useState("1");
+  const [adjustmentReason, setAdjustmentReason] = useState("");
+  const [adjustmentError, setAdjustmentError] = useState("");
+  const [adjusting, setAdjusting] = useState(false);
+
   const [supplierName, setSupplierName] = useState("");
   const [supplierInvoiceNumber, setSupplierInvoiceNumber] = useState("");
   const [notes, setNotes] = useState("");
@@ -332,34 +285,33 @@ export function InventoryPage() {
           lowStockResult,
           expiringResult,
           expiredResult,
-        ] =
-          await Promise.allSettled([
-            inventoryService.getSummary(),
+        ] = await Promise.allSettled([
+          inventoryService.getSummary(),
 
-            // Ask the backend for active batches with stock remaining.
-            // This preserves correct pagination and avoids client-side filtering.
-            inventoryService.getBatches({
-              page: requestedStockPage,
-              limit: PAGE_SIZE,
-              search: requestedStockSearch || undefined,
-              isActive: true,
-              lowStock: false,
-            }),
+          // Ask the backend for active batches with stock remaining.
+          // This preserves correct pagination and avoids client-side filtering.
+          inventoryService.getBatches({
+            page: requestedStockPage,
+            limit: PAGE_SIZE,
+            search: requestedStockSearch || undefined,
+            isActive: true,
+            lowStock: false,
+          }),
 
-            inventoryService.getReceipts({
-              page: requestedReceiptPage,
-              limit: PAGE_SIZE,
-              receiptNumber: requestedReceiptSearch || undefined,
-            }),
+          inventoryService.getReceipts({
+            page: requestedReceiptPage,
+            limit: PAGE_SIZE,
+            receiptNumber: requestedReceiptSearch || undefined,
+          }),
 
-            inventoryService.getTransactions({
-              page: requestedTransactionPage,
-              limit: PAGE_SIZE,
-            }),
-            inventoryService.getLowStock(),
-            inventoryService.getExpiring(),
-            inventoryService.getExpired(),
-          ]);
+          inventoryService.getTransactions({
+            page: requestedTransactionPage,
+            limit: PAGE_SIZE,
+          }),
+          inventoryService.getLowStock(),
+          inventoryService.getExpiring(),
+          inventoryService.getExpired(),
+        ]);
 
         if (summaryResult.status === "fulfilled") {
           setSummary(summaryResult.value);
@@ -369,7 +321,8 @@ export function InventoryPage() {
           const result = stockResult.value;
 
           // The backend applies the current-stock filter using:
-          // isActive=true and lowStock=false (quantity > 0).
+          // isActive=true and lowStock=false (quantity > 0). Low-stock batches
+          // remain visible here; the Alerts tab also highlights them.
           // Do not filter the paginated response on the client, otherwise a
           // page containing zero-stock batches could incorrectly appear empty.
           setBatches(result.data ?? []);
@@ -458,7 +411,13 @@ export function InventoryPage() {
     if (!item.batchNumber.trim())
       return setFormError("Batch number is required.");
     if (!item.expiryDate) return setFormError("Expiry date is required.");
-    if (item.quantity < 1) return setFormError("Quantity must be at least 1.");
+    const expiry = new Date(`${item.expiryDate}T00:00:00`);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (Number.isNaN(expiry.getTime()) || expiry <= today)
+      return setFormError("Expiry date must be in the future.");
+    if (!Number.isInteger(Number(item.quantity)) || item.quantity < 1)
+      return setFormError("Quantity must be a whole number of at least 1.");
     if (item.purchasePrice < 0 || item.sellingPrice < 0)
       return setFormError("Prices cannot be negative.");
     if (item.sellingPrice < item.purchasePrice)
@@ -537,6 +496,49 @@ export function InventoryPage() {
     }
   };
 
+  const resetAdjustment = () => {
+    setAdjustmentBatch(null);
+    setAdjustmentQuantity("1");
+    setAdjustmentReason("");
+    setAdjustmentError("");
+  };
+
+  const handleAdjustStock = async () => {
+    if (!adjustmentBatch) return;
+    const quantity = Number(adjustmentQuantity);
+    if (!Number.isInteger(quantity) || quantity === 0) {
+      setAdjustmentError(
+        "Enter a non-zero whole number. Use a negative value to reduce stock.",
+      );
+      return;
+    }
+    if (!adjustmentReason.trim()) {
+      setAdjustmentError("A reason is required for every stock adjustment.");
+      return;
+    }
+    try {
+      setAdjusting(true);
+      setAdjustmentError("");
+      await inventoryService.adjustStock(adjustmentBatch.id, {
+        quantity,
+        notes: adjustmentReason.trim(),
+      });
+      const name = adjustmentBatch.medicineName;
+      resetAdjustment();
+      setSuccess(`Stock adjusted successfully for ${name}.`);
+      window.setTimeout(() => setSuccess(""), 3500);
+      await loadData(true);
+    } catch (err: any) {
+      setAdjustmentError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Unable to adjust stock.",
+      );
+    } finally {
+      setAdjusting(false);
+    }
+  };
+
   const handleMarkExpired = async (batch: InventoryBatch) => {
     if (
       !window.confirm(
@@ -550,7 +552,9 @@ export function InventoryPage() {
       setRefreshing(true);
       setError("");
       await inventoryService.markExpired(batch.id);
-      setSuccess(`${batch.medicineName} batch ${batch.batchNumber} was written off as expired.`);
+      setSuccess(
+        `${batch.medicineName} batch ${batch.batchNumber} was written off as expired.`,
+      );
       window.setTimeout(() => setSuccess(""), 3500);
       await loadData(true);
     } catch (err: any) {
@@ -661,23 +665,23 @@ export function InventoryPage() {
 
       <div className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:mx-0 sm:px-0">
         <div className="flex w-max min-w-full items-center gap-1 rounded-xl bg-slate-100/70 p-1 sm:min-w-0 sm:w-fit">
-        {(
-          [
-            ["stock", "Current stock"],
-            ["alerts", "Stock alerts"],
-            ["transactions", "Transactions"],
-            ["receipts", "Stock receipts"],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => setTab(value)}
-            className={`shrink-0 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition ${tab === value ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
-          >
-            {label}
-          </button>
-        ))}
+          {(
+            [
+              ["stock", "Current stock"],
+              ["alerts", "Stock alerts"],
+              ["transactions", "Transactions"],
+              ["receipts", "Stock receipts"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setTab(value)}
+              className={`shrink-0 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition ${tab === value ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -708,6 +712,7 @@ export function InventoryPage() {
                 <span>Expiry</span>
                 <span>Stock</span>
                 <span>Sell price</span>
+                <span className="text-right">Actions</span>
               </div>
               {batches.length === 0 ? (
                 <div className="flex min-h-52 flex-col items-center justify-center px-6 text-center">
@@ -727,7 +732,7 @@ export function InventoryPage() {
                 batches.map((row) => (
                   <div
                     key={row.id}
-                    className="grid gap-3 px-4 py-4 transition hover:bg-slate-50/60 md:grid-cols-[2fr_1fr_1fr_0.8fr_1fr] md:items-center md:px-5 md:ring-1 md:ring-slate-100/70"
+                    className="grid gap-3 px-4 py-4 transition hover:bg-slate-50/60 md:grid-cols-[2fr_1fr_1fr_0.8fr_1fr_auto] md:items-center md:px-5 md:ring-1 md:ring-slate-100/70"
                   >
                     <div>
                       <p className="text-sm font-semibold text-slate-700">
@@ -752,6 +757,23 @@ export function InventoryPage() {
                     </div>
                     <div className="text-sm font-medium text-slate-600">
                       {money(row.sellingPrice)}
+                    </div>
+                    <div className="flex justify-start md:justify-end">
+                      {hasPermission("INVENTORY_UPDATE") && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAdjustmentBatch(row);
+                            setAdjustmentQuantity("1");
+                            setAdjustmentReason("");
+                            setAdjustmentError("");
+                          }}
+                          className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-teal-700 ring-1 ring-teal-200 transition hover:bg-teal-50"
+                          aria-label={`Adjust stock for ${row.medicineName}, batch ${row.batchNumber}`}
+                        >
+                          <Pencil className="size-3.5" /> Adjust
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))
@@ -813,7 +835,8 @@ export function InventoryPage() {
               Stock activity
             </h2>
             <p className="mt-1 text-xs text-slate-400">
-              Every receipt, dispense, return, adjustment, and expiry write-off is recorded here.
+              Every receipt, dispense, return, adjustment, and expiry write-off
+              is recorded here.
             </p>
           </div>
           {loading ? (
@@ -837,7 +860,8 @@ export function InventoryPage() {
                     No stock activity yet
                   </p>
                   <p className="mt-1 max-w-sm text-xs text-slate-400">
-                    Receiving stock and dispensing prescriptions will appear here.
+                    Receiving stock and dispensing prescriptions will appear
+                    here.
                   </p>
                 </div>
               ) : (
@@ -855,7 +879,9 @@ export function InventoryPage() {
                       </p>
                     </div>
                     <div>
-                      <span className={`inline-flex rounded-lg px-2.5 py-1 text-xs font-medium ring-1 ${transactionTone(transaction.type)}`}>
+                      <span
+                        className={`inline-flex rounded-lg px-2.5 py-1 text-xs font-medium ring-1 ${transactionTone(transaction.type)}`}
+                      >
                         {transactionLabel(transaction.type)}
                       </span>
                     </div>
@@ -890,7 +916,9 @@ export function InventoryPage() {
                     <button
                       type="button"
                       disabled={transactionPage <= 1}
-                      onClick={() => setTransactionPage((current) => current - 1)}
+                      onClick={() =>
+                        setTransactionPage((current) => current - 1)
+                      }
                       className="rounded-lg p-2 text-slate-400 hover:bg-slate-50 disabled:opacity-40"
                     >
                       <ChevronLeft className="size-4" />
@@ -898,7 +926,9 @@ export function InventoryPage() {
                     <button
                       type="button"
                       disabled={transactionPage >= transactionTotalPages}
-                      onClick={() => setTransactionPage((current) => current + 1)}
+                      onClick={() =>
+                        setTransactionPage((current) => current + 1)
+                      }
                       className="rounded-lg p-2 text-slate-400 hover:bg-slate-50 disabled:opacity-40"
                     >
                       <ChevronRight className="size-4" />
@@ -1003,6 +1033,107 @@ export function InventoryPage() {
             </div>
           )}
         </section>
+      )}
+
+      {adjustmentBatch && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/30 p-0 backdrop-blur-[1px] sm:items-center sm:p-6">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="adjust-stock-title"
+            className="w-full max-w-lg rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-6"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2
+                  id="adjust-stock-title"
+                  className="text-lg font-semibold text-slate-800"
+                >
+                  Adjust stock
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  {adjustmentBatch.medicineName}
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Batch {adjustmentBatch.batchNumber} · Current stock:{" "}
+                  {adjustmentBatch.quantity} units
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={adjusting}
+                onClick={resetAdjustment}
+                className="rounded-lg p-2 text-slate-400 hover:bg-slate-50"
+                aria-label="Close stock adjustment"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+            {adjustmentError && (
+              <div
+                role="alert"
+                className="mt-4 flex items-start gap-2 rounded-xl bg-red-50 px-3.5 py-3 text-sm text-red-700 ring-1 ring-red-100"
+              >
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <span>{adjustmentError}</span>
+              </div>
+            )}
+            <div className="mt-5 space-y-4">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-slate-500">
+                  Adjustment quantity
+                </span>
+                <input
+                  type="number"
+                  step={1}
+                  value={adjustmentQuantity}
+                  onChange={(event) => {
+                    setAdjustmentQuantity(event.target.value);
+                    setAdjustmentError("");
+                  }}
+                  className="h-10 w-full rounded-xl bg-white px-3.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-teal-500/20"
+                />
+                <span className="mt-1.5 block text-xs text-slate-400">
+                  Positive to add stock; negative to remove stock. Zero is not
+                  allowed.
+                </span>
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-slate-500">
+                  Reason <span className="text-rose-600">*</span>
+                </span>
+                <textarea
+                  rows={3}
+                  value={adjustmentReason}
+                  onChange={(event) => {
+                    setAdjustmentReason(event.target.value);
+                    setAdjustmentError("");
+                  }}
+                  placeholder="e.g. Physical count discrepancy, damaged stock"
+                  className="w-full resize-none rounded-xl bg-white px-3.5 py-3 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-teal-500/20"
+                />
+              </label>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  disabled={adjusting}
+                  onClick={resetAdjustment}
+                  className="h-10 rounded-xl px-4 text-sm font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={adjusting}
+                  onClick={() => void handleAdjustStock()}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-teal-600 px-5 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
+                >
+                  {adjusting && <ButtonSpinner />} Save adjustment
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {receiptOpen && selectedReceipt && (
@@ -1211,6 +1342,13 @@ export function InventoryPage() {
                   </span>
                   <input
                     type="date"
+                    min={new Date(
+                      Date.now() +
+                        86400000 -
+                        new Date().getTimezoneOffset() * 60000,
+                    )
+                      .toISOString()
+                      .slice(0, 10)}
                     value={item.expiryDate}
                     onChange={(e) => updateItem("expiryDate", e.target.value)}
                     className="h-10 w-full rounded-xl bg-white px-3.5 text-sm outline-none ring-1 ring-slate-200/70 focus:ring-2 focus:ring-teal-500/20"
@@ -1223,6 +1361,7 @@ export function InventoryPage() {
                   <input
                     type="number"
                     min={1}
+                    step={1}
                     value={item.quantity}
                     onChange={(e) =>
                       updateItem("quantity", Number(e.target.value))

@@ -1,7 +1,7 @@
-# Clinexa API Specification
+# SamaRoot API Specification
 
 **Document Version:** 1.0 (Draft)
-**Product:** Clinexa
+**Product:** SamaRoot
 **API Style:** REST
 **Format:** JSON over HTTPS
 **Authentication:** JWT Bearer Token
@@ -31,7 +31,7 @@
 
 # 1. Purpose
 
-This document defines the REST API standards and endpoint specifications for Clinexa.
+This document defines the REST API standards and endpoint specifications for SamaRoot.
 
 It serves as the contract between frontend and backend teams, ensuring consistency across all modules.
 
@@ -39,7 +39,7 @@ It serves as the contract between frontend and backend teams, ensuring consisten
 
 # 2. API Design Principles
 
-The Clinexa APIs follow these principles:
+The SamaRoot APIs follow these principles:
 
 * RESTful resource design
 * JSON request and response bodies
@@ -63,7 +63,7 @@ http://localhost:3000/api/v1
 Production
 
 ```text
-https://api.clinexa.com/api/v1
+https://api.samaroot.com/api/v1
 ```
 
 ---
@@ -437,4 +437,4 @@ The API is designed to support future capabilities including:
 * Maintain backward compatibility within the same API version.
 * Design APIs to be self-descriptive and easy to consume.
 
-> **The Clinexa API is designed as a secure, consistent, and scalable contract that enables independent frontend and backend development while preserving data integrity and tenant isolation.**
+> **The SamaRoot API is designed as a secure, consistent, and scalable contract that enables independent frontend and backend development while preserving data integrity and tenant isolation.**

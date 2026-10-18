@@ -10,10 +10,12 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { Permissions } from '../auth/decorators/permissions.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { RoleName } from '../auth/enums/role.enum';
+import { PermissionCodes } from '../auth/constants/permission-codes';
 
 import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
 
@@ -24,12 +26,13 @@ import { PermissionsService } from './permissions.service';
 @ApiTags('Permissions')
 @ApiBearerAuth()
 @Controller('permissions')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(RoleName.SUPER_ADMIN)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@Roles(RoleName.SUPER_ADMIN, RoleName.CLINIC_ADMIN)
 export class PermissionsController {
   constructor(private readonly permissionsService: PermissionsService) {}
 
   @Get()
+  @Permissions(PermissionCodes.PERMISSION_READ)
   @ApiOperation({
     summary: 'Get permissions',
   })
@@ -41,6 +44,7 @@ export class PermissionsController {
   }
 
   @Get(':id')
+  @Permissions(PermissionCodes.PERMISSION_READ)
   @ApiOperation({
     summary: 'Get permission by id',
   })

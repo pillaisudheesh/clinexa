@@ -1,6 +1,7 @@
 import {
   Activity,
   CalendarDays,
+  Building2,
   ClipboardList,
   FileText,
   FlaskConical,
@@ -77,9 +78,21 @@ export const mainNavigation: NavigationItem[] = [
 
 export const secondaryNavigation: NavigationItem[] = [
   {
+    label: "Clinics",
+    path: "/clinics",
+    icon: Building2,
+    permission: "CLINIC_READ",
+  },
+  {
     label: "Reports",
     path: "/reports",
     icon: FileText,
+  },
+  {
+    label: "Departments",
+    path: "/departments",
+    icon: Building2,
+    permission: "DEPARTMENT_READ",
   },
   {
     label: "Settings",

@@ -11,7 +11,7 @@ export async function seedUsers(
 
   const admin = await prisma.user.upsert({
     where: {
-      email: 'admin@clinexa.com',
+      email: 'admin@samaroot.com',
     },
     update: {},
     create: {
@@ -20,7 +20,7 @@ export async function seedUsers(
       firstName: 'System',
       lastName: 'Administrator',
 
-      email: 'admin@clinexa.com',
+      email: 'admin@samaroot.com',
 
       passwordHash,
 

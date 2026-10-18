@@ -6,6 +6,7 @@ import { seedPermissions } from './seeds/permission.seed';
 import { seedRoles } from './seeds/role.seed';
 import { seedUsers } from './seeds/user.seed';
 import { seedRolePermissions } from './seeds/role-permission.seed';
+import { assignDefaultRolePermissions } from '../src/roles/default-role-permissions';
 import { seedDepartments } from './seeds/department.seed';
 import { seedSpecialties } from './seeds/specialty.seed';
 import { qualifications } from './data/master/qualifications';
@@ -27,6 +28,9 @@ async function main() {
   const roles = await seedRoles(prisma, clinic.id);
 
   await seedRolePermissions(prisma, roles);
+  await prisma.$transaction((tx) =>
+    assignDefaultRolePermissions(tx, clinic.id),
+  );
 
   await seedUsers(prisma, clinic.id, roles);
 

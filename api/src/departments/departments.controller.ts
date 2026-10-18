@@ -18,7 +18,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-// import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 
 import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
 
@@ -34,8 +34,7 @@ import { PermissionCodes } from '../auth/constants/permission-codes';
 @ApiTags('Departments')
 @ApiBearerAuth()
 @Controller('departments')
-@UseGuards(JwtAuthGuard)
-// @UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class DepartmentsController {
   constructor(private readonly departmentsService: DepartmentsService) {}
 

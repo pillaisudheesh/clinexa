@@ -73,7 +73,11 @@ export class InventoryController {
     @Req() req: AuthenticatedRequest,
     @Body() dto: CreateMedicineBatchDto,
   ): Promise<MedicineBatchResponseDto> {
-    return this.inventoryService.createBatch(req.user.clinicId, dto);
+    return this.inventoryService.createBatch(
+      req.user.clinicId,
+      dto,
+      req.user.id,
+    );
   }
 
   // ===========================================================================
@@ -136,7 +140,12 @@ export class InventoryController {
     id: string,
     @Body() dto: AdjustStockDto,
   ): Promise<MedicineBatchResponseDto> {
-    return this.inventoryService.adjustStock(req.user.clinicId, id, dto);
+    return this.inventoryService.adjustStock(
+      req.user.clinicId,
+      id,
+      dto,
+      req.user.id,
+    );
   }
 
   // ===========================================================================
@@ -256,7 +265,11 @@ export class InventoryController {
     @Param('id', new ParseUUIDPipe())
     id: string,
   ): Promise<MedicineBatchResponseDto> {
-    return this.inventoryService.markExpired(req.user.clinicId, id);
+    return this.inventoryService.markExpired(
+      req.user.clinicId,
+      id,
+      req.user.id,
+    );
   }
 
   // ===========================================================================
@@ -367,7 +380,11 @@ export class InventoryController {
     @Req() req: AuthenticatedRequest,
     @Body() dto: CreateStockReceiptDto,
   ): Promise<StockReceiptResponseDto> {
-    return this.inventoryService.createStockReceipt(req.user.clinicId, dto);
+    return this.inventoryService.createStockReceipt(
+      req.user.clinicId,
+      dto,
+      req.user.id,
+    );
   }
 
   // ===========================================================================

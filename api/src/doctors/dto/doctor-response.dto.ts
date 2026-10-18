@@ -87,6 +87,24 @@ export class DoctorResponseDto {
   })
   languages!: LanguageReferenceDto[];
 
+  @ApiPropertyOptional()
+  consultationFee?: string;
+
+  @ApiPropertyOptional()
+  followUpFee?: string;
+
+  @ApiPropertyOptional()
+  emergencyFee?: string;
+
+  @ApiPropertyOptional()
+  teleConsultationFee?: string;
+
+  @ApiPropertyOptional({ type: [Object] })
+  schedule?: Array<{ dayOfWeek: number; startTime: string; endTime: string; isAvailable: boolean }>;
+
+  @ApiPropertyOptional()
+  slotDuration?: number;
+
   @ApiProperty()
   isActive!: boolean;
 

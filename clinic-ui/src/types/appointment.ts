@@ -127,5 +127,7 @@ export interface AppointmentAvailabilityResponse {
   date: string;
   slotDuration: number;
   bufferTime: number;
+  manualTimeEntry?: boolean;
+  workingHours?: { startTime: string; endTime: string };
   slots: AppointmentAvailabilitySlot[];
 }

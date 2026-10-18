@@ -200,6 +200,14 @@ interface EditForm {
   employmentType: string;
   yearsOfExperience: string;
   biography: string;
+  consultationFee: string;
+  followUpFee: string;
+  emergencyFee: string;
+  teleConsultationFee: string;
+  scheduleDays: number[];
+  scheduleStartTime: string;
+  scheduleEndTime: string;
+  slotDuration: string;
 }
 
 const doctorToForm = (doctor: Doctor): EditForm => ({
@@ -236,6 +244,22 @@ const doctorToForm = (doctor: Doctor): EditForm => ({
       ? String(doctor.yearsOfExperience)
       : "",
   biography: doctor.biography ?? "",
+  consultationFee: doctor.consultationFee ?? "",
+  followUpFee: doctor.followUpFee ?? "",
+  emergencyFee: doctor.emergencyFee ?? "",
+  teleConsultationFee: doctor.teleConsultationFee ?? "",
+  scheduleDays: [
+    ...new Set(
+      (doctor.schedule ?? [])
+        .filter((slot) => slot.isAvailable)
+        .map((slot) => slot.dayOfWeek),
+    ),
+  ],
+  scheduleStartTime:
+    doctor.schedule?.find((slot) => slot.isAvailable)?.startTime ?? "09:00",
+  scheduleEndTime:
+    doctor.schedule?.find((slot) => slot.isAvailable)?.endTime ?? "18:00",
+  slotDuration: String(doctor.slotDuration ?? 30),
 });
 
 function EditInput({
@@ -363,7 +387,8 @@ export function DoctorProfilePage() {
     useState(false);
 
   const [referenceLoading, setReferenceLoading] = useState(false);
-
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState(false);
   const loadDoctor = useCallback(async () => {
     if (!id) {
       setError("Doctor ID is missing.");
@@ -479,6 +504,31 @@ export function DoctorProfilePage() {
     loadSpecialties();
   }, [editing, editForm?.departmentId]);
 
+  const handleToggleStatus = async () => {
+    if (!doctor || statusUpdating) return;
+
+    const nextIsActive = !doctor.isActive;
+    setStatusUpdating(true);
+    setActionError(null);
+
+    try {
+      const updated = await doctorService.updateDoctorStatus(doctor.id, {
+        isActive: nextIsActive,
+      });
+
+      setDoctor(updated);
+      setStatusModalOpen(false);
+      setSuccessMessage(
+        `Doctor ${nextIsActive ? "activated" : "deactivated"} successfully.`,
+      );
+    } catch (error) {
+      console.error("Unable to update doctor status.", error);
+      setActionError("Unable to update doctor status. Please try again.");
+    } finally {
+      setStatusUpdating(false);
+    }
+  };
+
   const handleStartEdit = () => {
     if (!doctor) {
       return;
@@ -553,7 +603,30 @@ export function DoctorProfilePage() {
           ? Number(editForm.yearsOfExperience)
           : undefined,
         biography: editForm.biography.trim() || undefined,
+        consultationFee: Number(editForm.consultationFee),
+        followUpFee: editForm.followUpFee.trim()
+          ? Number(editForm.followUpFee)
+          : undefined,
+        emergencyFee: editForm.emergencyFee.trim()
+          ? Number(editForm.emergencyFee)
+          : undefined,
+        teleConsultationFee: editForm.teleConsultationFee.trim()
+          ? Number(editForm.teleConsultationFee)
+          : undefined,
+        scheduleDays: editForm.scheduleDays,
+        scheduleStartTime: editForm.scheduleStartTime,
+        scheduleEndTime: editForm.scheduleEndTime,
+        slotDuration: Number(editForm.slotDuration),
       };
+
+      if (
+        !editForm.consultationFee.trim() ||
+        !Number.isFinite(Number(editForm.consultationFee)) ||
+        Number(editForm.consultationFee) < 0
+      ) {
+        setActionError("A valid standard consultation fee is required.");
+        return;
+      }
 
       const updated = await doctorService.updateDoctor(doctor.id, payload);
 
@@ -819,20 +892,21 @@ export function DoctorProfilePage() {
 
                 <button
                   type="button"
-                  className="
-                    inline-flex
-                    h-10
-                    items-center
-                    justify-center
-                    rounded-xl
-                    bg-red-50
-                    px-4
-                    text-xs
-                    font-semibold
-                    text-red-600
-                    transition-colors
-                    hover:bg-red-100
-                  "
+                  disabled={statusUpdating}
+                  onClick={() => {
+                    setActionError(null);
+                    setStatusModalOpen(true);
+                  }}
+                  className={`
+                            inline-flex h-10 items-center justify-center rounded-xl
+                            px-4 text-xs font-semibold transition-colors
+                            disabled:cursor-not-allowed disabled:opacity-50
+                            ${
+                              doctor.isActive
+                                ? "bg-red-50 text-red-600 hover:bg-red-100"
+                                : "bg-teal-50 text-teal-700 hover:bg-teal-100"
+                            }
+                          `}
                 >
                   {doctor.isActive ? "Deactivate" : "Activate"}
                 </button>
@@ -962,6 +1036,90 @@ export function DoctorProfilePage() {
               </div>
             </div>
           )}
+        </Section>
+
+        <Section
+          icon={<CalendarDays size={18} />}
+          title="Consultation fees and availability"
+          description="Current consultation charges and the doctor's regular working hours."
+        >
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <InfoItem
+              label="Standard consultation"
+              value={
+                doctor.consultationFee != null
+                  ? `₹${Number(doctor.consultationFee).toLocaleString("en-IN")}`
+                  : "Not configured"
+              }
+            />
+            <InfoItem
+              label="Follow-up consultation"
+              value={
+                doctor.followUpFee != null
+                  ? `₹${Number(doctor.followUpFee).toLocaleString("en-IN")}`
+                  : "Not configured"
+              }
+            />
+            <InfoItem
+              label="Emergency consultation"
+              value={
+                doctor.emergencyFee != null
+                  ? `₹${Number(doctor.emergencyFee).toLocaleString("en-IN")}`
+                  : "Not configured"
+              }
+            />
+            <InfoItem
+              label="Teleconsultation"
+              value={
+                doctor.teleConsultationFee != null
+                  ? `₹${Number(doctor.teleConsultationFee).toLocaleString("en-IN")}`
+                  : "Not configured"
+              }
+            />
+          </div>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <InfoItem
+              label="Appointment duration"
+              value={
+                doctor.slotDuration
+                  ? `${doctor.slotDuration} minutes`
+                  : "Not configured"
+              }
+            />
+            <div>
+              <p className="text-xs font-medium text-slate-400">
+                Working days and hours
+              </p>
+              {doctor.schedule?.some((slot) => slot.isAvailable) ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {doctor.schedule
+                    .filter((slot) => slot.isAvailable)
+                    .sort((a, b) => a.dayOfWeek - b.dayOfWeek)
+                    .map((slot) => (
+                      <span
+                        key={slot.dayOfWeek}
+                        className="rounded-lg bg-teal-50 px-2.5 py-1.5 text-xs font-medium text-teal-800"
+                      >
+                        {[
+                          "Sunday",
+                          "Monday",
+                          "Tuesday",
+                          "Wednesday",
+                          "Thursday",
+                          "Friday",
+                          "Saturday",
+                        ][slot.dayOfWeek] ?? `Day ${slot.dayOfWeek}`}{" "}
+                        · {slot.startTime}–{slot.endTime}
+                      </span>
+                    ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-slate-500">
+                  No working hours configured
+                </p>
+              )}
+            </div>
+          </div>
         </Section>
 
         <Section
@@ -1507,6 +1665,135 @@ export function DoctorProfilePage() {
                   }
                 />
 
+                <div className="sm:col-span-2 rounded-xl bg-slate-50/70 p-4 ring-1 ring-slate-200/70">
+                  <h3 className="mb-3 text-sm font-semibold text-slate-800">
+                    Consultation fees
+                  </h3>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {(
+                      [
+                        ["consultationFee", "Standard fee (required)"],
+                        ["followUpFee", "Follow-up fee"],
+                        ["emergencyFee", "Emergency fee"],
+                        ["teleConsultationFee", "Teleconsultation fee"],
+                      ] as const
+                    ).map(([field, label]) => (
+                      <div key={field}>
+                        <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+                          {label}
+                        </label>
+                        <div className="flex items-center rounded-lg bg-white ring-1 ring-slate-200">
+                          <span className="pl-3 text-sm text-slate-500">₹</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={editForm[field]}
+                            onChange={(event) =>
+                              setEditForm((current) =>
+                                current
+                                  ? { ...current, [field]: event.target.value }
+                                  : current,
+                              )
+                            }
+                            className="w-full rounded-lg bg-transparent px-3 py-2.5 text-sm text-slate-700 outline-none"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="sm:col-span-2 rounded-xl bg-slate-50/70 p-4 ring-1 ring-slate-200/70">
+                  <h3 className="mb-1 text-sm font-semibold text-slate-800">
+                    Doctor availability
+                  </h3>
+                  <p className="mb-3 text-xs text-slate-500">
+                    Set the days and hours this doctor accepts appointments.
+                    These must fit within clinic working hours.
+                  </p>
+                  <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {[
+                      { label: "Sunday", value: 0 },
+                      { label: "Monday", value: 1 },
+                      { label: "Tuesday", value: 2 },
+                      { label: "Wednesday", value: 3 },
+                      { label: "Thursday", value: 4 },
+                      { label: "Friday", value: 5 },
+                      { label: "Saturday", value: 6 },
+                    ].map((day) => (
+                      <label
+                        key={day.value}
+                        className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs text-slate-700 ring-1 ring-slate-200"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={editForm.scheduleDays.includes(day.value)}
+                          onChange={(event) =>
+                            setEditForm((current) =>
+                              current
+                                ? {
+                                    ...current,
+                                    scheduleDays: event.target.checked
+                                      ? [
+                                          ...new Set([
+                                            ...current.scheduleDays,
+                                            day.value,
+                                          ]),
+                                        ]
+                                      : current.scheduleDays.filter(
+                                          (value) => value !== day.value,
+                                        ),
+                                  }
+                                : current,
+                            )
+                          }
+                          className="accent-teal-600"
+                        />
+                        {day.label}
+                      </label>
+                    ))}
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <EditInput
+                      label="Start time"
+                      type="time"
+                      value={editForm.scheduleStartTime}
+                      onChange={(value) =>
+                        setEditForm((current) =>
+                          current
+                            ? { ...current, scheduleStartTime: value }
+                            : current,
+                        )
+                      }
+                    />
+                    <EditInput
+                      label="End time"
+                      type="time"
+                      value={editForm.scheduleEndTime}
+                      onChange={(value) =>
+                        setEditForm((current) =>
+                          current
+                            ? { ...current, scheduleEndTime: value }
+                            : current,
+                        )
+                      }
+                    />
+                    <EditInput
+                      label="Slot duration (minutes)"
+                      type="number"
+                      value={editForm.slotDuration}
+                      onChange={(value) =>
+                        setEditForm((current) =>
+                          current
+                            ? { ...current, slotDuration: value }
+                            : current,
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+
                 <div className="sm:col-span-2">
                   <label className="mb-1.5 block text-xs font-semibold text-slate-600">
                     Biography
@@ -1587,6 +1874,122 @@ export function DoctorProfilePage() {
                 >
                   {saving ? "Saving..." : "Save changes"}
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {statusModalOpen && doctor && (
+        <div
+          className="
+      fixed inset-0 z-[60] flex items-end justify-center
+      bg-slate-900/20 backdrop-blur-[2px]
+      sm:items-center sm:p-6
+    "
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !statusUpdating) {
+              setStatusModalOpen(false);
+            }
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="doctor-status-title"
+            className="
+        w-full rounded-t-3xl bg-white shadow-2xl
+        ring-1 ring-slate-200/60
+        sm:max-w-md sm:rounded-3xl
+      "
+          >
+            <div className="flex items-start justify-between px-5 py-4 sm:px-6">
+              <div>
+                <h2
+                  id="doctor-status-title"
+                  className="text-base font-semibold text-slate-800"
+                >
+                  {doctor.isActive ? "Deactivate doctor?" : "Activate doctor?"}
+                </h2>
+
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  {doctor.isActive
+                    ? `Are you sure you want to deactivate Dr. ${doctor.firstName} ${doctor.lastName}?`
+                    : `Are you sure you want to activate Dr. ${doctor.firstName} ${doctor.lastName}?`}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                disabled={statusUpdating}
+                onClick={() => setStatusModalOpen(false)}
+                aria-label="Close dialog"
+                className="
+            flex size-8 shrink-0 items-center justify-center
+            rounded-lg text-slate-400 hover:bg-slate-50
+            hover:text-slate-600 disabled:opacity-50
+          "
+              >
+                <X size={17} />
+              </button>
+            </div>
+
+            <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+
+            <div className="space-y-4 p-5 sm:p-6">
+              {actionError && (
+                <div
+                  role="alert"
+                  className="rounded-xl bg-red-50 px-4 py-3 text-xs text-red-600"
+                >
+                  {actionError}
+                </div>
+              )}
+
+              <p className="text-sm leading-6 text-slate-600">
+                {doctor.isActive
+                  ? "The doctor will be marked inactive. Please confirm before continuing."
+                  : "The doctor will be marked active and available according to the clinic's scheduling rules."}
+              </p>
+
+              <div className="mt-5">
+                <div className="mb-4 h-px w-full bg-slate-200/70" />
+
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    disabled={statusUpdating}
+                    onClick={() => setStatusModalOpen(false)}
+                    className="
+        h-10 rounded-xl px-4 text-xs font-semibold
+        text-slate-600 ring-1 ring-slate-200
+        hover:bg-slate-50 disabled:opacity-50
+      "
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={statusUpdating}
+                    onClick={() => void handleToggleStatus()}
+                    className={`
+        h-10 rounded-xl px-4 text-xs font-semibold
+        text-white transition-colors
+        disabled:cursor-not-allowed disabled:opacity-50
+        ${
+          doctor.isActive
+            ? "bg-red-600 hover:bg-red-700"
+            : "bg-teal-600 hover:bg-teal-700"
+        }
+      `}
+                  >
+                    {statusUpdating
+                      ? "Updating..."
+                      : doctor.isActive
+                        ? "Deactivate doctor"
+                        : "Activate doctor"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

@@ -10,6 +10,8 @@ export class AppointmentAvailabilityResponseDto {
 
   slotDuration!: number;
   bufferTime!: number;
+  manualTimeEntry?: boolean;
+  workingHours?: { startTime: string; endTime: string };
 
   slots!: AppointmentAvailabilitySlotDto[];
 }

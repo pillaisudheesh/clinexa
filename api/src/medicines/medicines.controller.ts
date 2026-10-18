@@ -27,12 +27,10 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import { PermissionCodes } from '../auth/constants/permission-codes';
 
 import { MedicinesService } from './medicines.service';
-
 import { CreateMedicineDto } from './dto/create-medicine.dto';
 import { UpdateMedicineDto } from './dto/update-medicine.dto';
 import { MedicineQueryDto } from './dto/medicine-query.dto';
 import { MedicineResponseDto } from './dto/medicine-response.dto';
-
 import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
 
 interface AuthenticatedRequest extends Request {
@@ -49,15 +47,9 @@ interface AuthenticatedRequest extends Request {
 export class MedicinesController {
   constructor(private readonly medicinesService: MedicinesService) {}
 
-  // ===========================================================================
-  // CREATE
-  // ===========================================================================
-
   @Post()
   @Permissions(PermissionCodes.PHARMACY_CREATE)
-  @ApiOperation({
-    summary: 'Create medicine',
-  })
+  @ApiOperation({ summary: 'Create medicine' })
   @ApiResponse({
     status: 201,
     description: 'Medicine created successfully.',
@@ -67,18 +59,12 @@ export class MedicinesController {
     @Req() req: AuthenticatedRequest,
     @Body() dto: CreateMedicineDto,
   ): Promise<MedicineResponseDto> {
-    return this.medicinesService.create(req.user.clinicId, dto);
+    return this.medicinesService.create(req.user.clinicId, dto, req.user.id);
   }
-
-  // ===========================================================================
-  // LIST
-  // ===========================================================================
 
   @Get()
   @Permissions(PermissionCodes.PHARMACY_READ)
-  @ApiOperation({
-    summary: 'Get medicines',
-  })
+  @ApiOperation({ summary: 'Get medicines' })
   @ApiResponse({
     status: 200,
     description: 'Medicines retrieved successfully.',
@@ -90,15 +76,9 @@ export class MedicinesController {
     return this.medicinesService.findAll(req.user.clinicId, query);
   }
 
-  // ===========================================================================
-  // GET BY ID
-  // ===========================================================================
-
   @Get(':id')
   @Permissions(PermissionCodes.PHARMACY_READ)
-  @ApiOperation({
-    summary: 'Get medicine by ID',
-  })
+  @ApiOperation({ summary: 'Get medicine by ID' })
   @ApiResponse({
     status: 200,
     description: 'Medicine retrieved successfully.',
@@ -106,21 +86,14 @@ export class MedicinesController {
   })
   findOne(
     @Req() req: AuthenticatedRequest,
-    @Param('id', new ParseUUIDPipe())
-    id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
   ): Promise<MedicineResponseDto> {
     return this.medicinesService.findOne(req.user.clinicId, id);
   }
 
-  // ===========================================================================
-  // UPDATE
-  // ===========================================================================
-
   @Patch(':id')
   @Permissions(PermissionCodes.PHARMACY_UPDATE)
-  @ApiOperation({
-    summary: 'Update medicine',
-  })
+  @ApiOperation({ summary: 'Update medicine' })
   @ApiResponse({
     status: 200,
     description: 'Medicine updated successfully.',
@@ -128,31 +101,28 @@ export class MedicinesController {
   })
   update(
     @Req() req: AuthenticatedRequest,
-    @Param('id', new ParseUUIDPipe())
-    id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @Body() dto: UpdateMedicineDto,
   ): Promise<MedicineResponseDto> {
-    return this.medicinesService.update(req.user.clinicId, id, dto);
+    return this.medicinesService.update(
+      req.user.clinicId,
+      id,
+      dto,
+      req.user.id,
+    );
   }
-
-  // ===========================================================================
-  // DELETE / DEACTIVATE
-  // ===========================================================================
 
   @Delete(':id')
   @Permissions(PermissionCodes.PHARMACY_DELETE)
-  @ApiOperation({
-    summary: 'Deactivate medicine',
-  })
+  @ApiOperation({ summary: 'Deactivate medicine' })
   @ApiResponse({
     status: 200,
     description: 'Medicine deactivated successfully.',
   })
   remove(
     @Req() req: AuthenticatedRequest,
-    @Param('id', new ParseUUIDPipe())
-    id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
   ): Promise<{ message: string }> {
-    return this.medicinesService.remove(req.user.clinicId, id);
+    return this.medicinesService.remove(req.user.clinicId, id, req.user.id);
   }
 }

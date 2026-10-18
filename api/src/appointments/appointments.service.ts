@@ -18,6 +18,7 @@ import {
 } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
@@ -35,12 +36,15 @@ import { InvoiceResponseDto } from '../invoices/dto/invoice-response.dto';
 
 @Injectable()
 export class AppointmentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   /**
    * Create a new appointment.
    */
-  async create(clinicId: string, dto: CreateAppointmentDto) {
+  async create(clinicId: string, dto: CreateAppointmentDto, actorId: string) {
     const patient = await this.prisma.patient.findFirst({
       where: {
         id: dto.patientId,
@@ -73,6 +77,13 @@ export class AppointmentsService {
     const appointmentDate = this.parseDate(dto.appointmentDate);
 
     this.validateNotInPast(appointmentDate, dto.startTime);
+    const clinicHours = await this.getClinicWorkingHours(clinicId);
+    this.validateAgainstClinicHours(
+      clinicHours,
+      appointmentDate,
+      dto.startTime,
+      dto.endTime,
+    );
 
     const schedule = await this.prisma.doctorSchedule.findUnique({
       where: {
@@ -83,37 +94,38 @@ export class AppointmentsService {
       },
     });
 
-    if (!schedule) {
-      throw new BadRequestException(
-        'Doctor does not have a schedule configured',
+    if (schedule) {
+      const dayOfWeek = appointmentDate.getDay();
+      const scheduleSlot = schedule.slots.find(
+        (slot) =>
+          slot.dayOfWeek === dayOfWeek &&
+          slot.isAvailable &&
+          this.isTimeWithinSchedule(
+            dto.startTime,
+            dto.endTime,
+            slot.startTime,
+            slot.endTime,
+          ),
+      );
+
+      if (!scheduleSlot) {
+        throw new BadRequestException(
+          'Selected time is outside the doctor schedule',
+        );
+      }
+
+      this.validateSlotDuration(
+        dto.startTime,
+        dto.endTime,
+        schedule.slotDuration,
+      );
+    } else {
+      this.validateSlotDuration(
+        dto.startTime,
+        dto.endTime,
+        clinicHours.defaultAppointmentDuration,
       );
     }
-
-    const dayOfWeek = appointmentDate.getDay();
-
-    const scheduleSlot = schedule.slots.find(
-      (slot) =>
-        slot.dayOfWeek === dayOfWeek &&
-        slot.isAvailable &&
-        this.isTimeWithinSchedule(
-          dto.startTime,
-          dto.endTime,
-          slot.startTime,
-          slot.endTime,
-        ),
-    );
-
-    if (!scheduleSlot) {
-      throw new BadRequestException(
-        'Selected time is outside the doctor schedule',
-      );
-    }
-
-    this.validateSlotDuration(
-      dto.startTime,
-      dto.endTime,
-      schedule.slotDuration,
-    );
 
     const conflictingAppointment = await this.findConflictingAppointment(
       doctor.id,
@@ -161,6 +173,21 @@ export class AppointmentsService {
       },
 
       include: this.appointmentInclude(),
+    });
+
+    await this.auditService.create({
+      clinicId,
+      actorId,
+      action: 'CREATE',
+      entityType: 'Appointment',
+      entityId: appointment.id,
+      description: 'Appointment created',
+      metadata: {
+        appointmentNumber: appointment.appointmentNumber,
+        patientId: appointment.patientId,
+        doctorId: appointment.doctorId,
+        status: appointment.status,
+      },
     });
 
     return this.toResponse(appointment);
@@ -360,7 +387,12 @@ export class AppointmentsService {
   /**
    * Update an appointment.
    */
-  async update(clinicId: string, id: string, dto: UpdateAppointmentDto) {
+  async update(
+    clinicId: string,
+    id: string,
+    dto: UpdateAppointmentDto,
+    actorId: string,
+  ) {
     const existing = await this.prisma.appointment.findFirst({
       where: {
         id,
@@ -386,6 +418,13 @@ export class AppointmentsService {
 
     if (dto.appointmentDate || dto.startTime || dto.endTime) {
       this.validateNotInPast(appointmentDate, startTime);
+      const clinicHours = await this.getClinicWorkingHours(clinicId);
+      this.validateAgainstClinicHours(
+        clinicHours,
+        appointmentDate,
+        startTime,
+        endTime,
+      );
 
       const doctor = await this.prisma.doctor.findFirst({
         where: {
@@ -408,33 +447,34 @@ export class AppointmentsService {
         },
       });
 
-      if (!schedule) {
-        throw new BadRequestException(
-          'Doctor does not have a schedule configured',
+      if (schedule) {
+        const dayOfWeek = appointmentDate.getDay();
+        const scheduleSlot = schedule.slots.find(
+          (slot) =>
+            slot.dayOfWeek === dayOfWeek &&
+            slot.isAvailable &&
+            this.isTimeWithinSchedule(
+              startTime,
+              endTime,
+              slot.startTime,
+              slot.endTime,
+            ),
+        );
+
+        if (!scheduleSlot) {
+          throw new BadRequestException(
+            'Selected time is outside the doctor schedule',
+          );
+        }
+
+        this.validateSlotDuration(startTime, endTime, schedule.slotDuration);
+      } else {
+        this.validateSlotDuration(
+          startTime,
+          endTime,
+          clinicHours.defaultAppointmentDuration,
         );
       }
-
-      const dayOfWeek = appointmentDate.getDay();
-
-      const scheduleSlot = schedule.slots.find(
-        (slot) =>
-          slot.dayOfWeek === dayOfWeek &&
-          slot.isAvailable &&
-          this.isTimeWithinSchedule(
-            startTime,
-            endTime,
-            slot.startTime,
-            slot.endTime,
-          ),
-      );
-
-      if (!scheduleSlot) {
-        throw new BadRequestException(
-          'Selected time is outside the doctor schedule',
-        );
-      }
-
-      this.validateSlotDuration(startTime, endTime, schedule.slotDuration);
 
       const conflict = await this.findConflictingAppointment(
         existing.doctorId,
@@ -496,13 +536,32 @@ export class AppointmentsService {
       include: this.appointmentInclude(),
     });
 
+    await this.auditService.create({
+      clinicId,
+      actorId,
+      action: 'UPDATE',
+      entityType: 'Appointment',
+      entityId: updated.id,
+      description: 'Appointment updated',
+      metadata: {
+        appointmentNumber: updated.appointmentNumber,
+        previousStatus: existing.status,
+        newStatus: updated.status,
+      },
+    });
+
     return this.toResponse(updated);
   }
 
   /**
    * Cancel appointment.
    */
-  async cancel(clinicId: string, id: string, reason?: string) {
+  async cancel(
+    clinicId: string,
+    id: string,
+    reason: string | undefined,
+    actorId: string,
+  ) {
     const appointment = await this.prisma.appointment.findFirst({
       where: {
         id,
@@ -537,6 +596,20 @@ export class AppointmentsService {
       include: this.appointmentInclude(),
     });
 
+    await this.auditService.create({
+      clinicId,
+      actorId,
+      action: 'UPDATE',
+      entityType: 'Appointment',
+      entityId: updated.id,
+      description: 'Appointment cancelled',
+      metadata: {
+        previousStatus: appointment.status,
+        newStatus: updated.status,
+        reason: reason ?? null,
+      },
+    });
+
     return this.toResponse(updated);
   }
 
@@ -560,6 +633,22 @@ export class AppointmentsService {
     }
 
     const date = this.parseDate(query.date);
+    const clinicHours = await this.getClinicWorkingHours(clinicId);
+    if (!this.isClinicWorkingDay(clinicHours, date)) {
+      return {
+        doctorId: doctor.id,
+        date: query.date,
+        slotDuration: clinicHours.defaultAppointmentDuration,
+        bufferTime: 0,
+        manualTimeEntry: false,
+        clinicClosed: true,
+        workingHours: {
+          startTime: clinicHours.openingTime,
+          endTime: clinicHours.closingTime,
+        },
+        slots: [],
+      };
+    }
 
     const schedule = await this.prisma.doctorSchedule.findUnique({
       where: {
@@ -578,15 +667,29 @@ export class AppointmentsService {
     });
 
     if (!schedule) {
-      throw new BadRequestException(
-        'Doctor does not have a schedule configured',
-      );
+      return {
+        doctorId: doctor.id,
+        date: query.date,
+        slotDuration: clinicHours.defaultAppointmentDuration,
+        bufferTime: 0,
+        manualTimeEntry: true,
+        workingHours: {
+          startTime: clinicHours.openingTime,
+          endTime: clinicHours.closingTime,
+        },
+        slots: [],
+      };
     }
 
     const dayOfWeek = date.getDay();
 
     const workingSlots = schedule.slots.filter(
-      (slot) => slot.dayOfWeek === dayOfWeek,
+      (slot) =>
+        slot.dayOfWeek === dayOfWeek &&
+        this.timeToMinutes(slot.startTime) >=
+          this.timeToMinutes(clinicHours.openingTime) &&
+        this.timeToMinutes(slot.endTime) <=
+          this.timeToMinutes(clinicHours.closingTime),
     );
 
     if (workingSlots.length === 0) {
@@ -657,6 +760,11 @@ export class AppointmentsService {
       date: query.date,
       slotDuration: schedule.slotDuration,
       bufferTime: schedule.bufferTime,
+      manualTimeEntry: false,
+      workingHours: {
+        startTime: clinicHours.openingTime,
+        endTime: clinicHours.closingTime,
+      },
       slots,
     };
   }
@@ -664,15 +772,20 @@ export class AppointmentsService {
   /**
    * Confirm appointment.
    */
-  async confirm(clinicId: string, id: string) {
-    return this.changeStatus(clinicId, id, AppointmentStatus.CONFIRMED);
+  async confirm(clinicId: string, id: string, actorId: string) {
+    return this.changeStatus(
+      clinicId,
+      id,
+      AppointmentStatus.CONFIRMED,
+      actorId,
+    );
   }
 
   /**
    * Check patient in.
    */
-  async checkIn(clinicId: string, id: string) {
-    return this.prisma.$transaction(async (tx) => {
+  async checkIn(clinicId: string, id: string, actorId: string) {
+    const result = await this.prisma.$transaction(async (tx) => {
       const appointment = await tx.appointment.findFirst({
         where: {
           id,
@@ -722,7 +835,7 @@ export class AppointmentsService {
 
       const invoiceNumber = await this.generateInvoiceNumber(tx, clinicId);
 
-      await tx.invoice.create({
+      const invoice = await tx.invoice.create({
         data: {
           invoiceNumber,
           clinicId: appointment.clinicId,
@@ -760,15 +873,46 @@ export class AppointmentsService {
         include: this.appointmentInclude(),
       });
 
-      return this.toResponse(updatedAppointment);
+      return {
+        response: this.toResponse(updatedAppointment),
+        appointmentId: updatedAppointment.id,
+        appointmentNumber: updatedAppointment.appointmentNumber,
+        previousStatus: appointment.status,
+        newStatus: updatedAppointment.status,
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+      };
     });
+
+    await this.auditService.create({
+      clinicId,
+      actorId,
+      action: 'UPDATE',
+      entityType: 'Appointment',
+      entityId: result.appointmentId,
+      description: 'Appointment checked in',
+      metadata: {
+        appointmentNumber: result.appointmentNumber,
+        previousStatus: result.previousStatus,
+        newStatus: result.newStatus,
+        invoiceId: result.invoiceId,
+        invoiceNumber: result.invoiceNumber,
+      },
+    });
+
+    return result.response;
   }
 
   /**
    * Start consultation.
    */
-  async startConsultation(clinicId: string, id: string) {
-    return this.changeStatus(clinicId, id, AppointmentStatus.IN_CONSULTATION);
+  async startConsultation(clinicId: string, id: string, actorId: string) {
+    return this.changeStatus(
+      clinicId,
+      id,
+      AppointmentStatus.IN_CONSULTATION,
+      actorId,
+    );
   }
 
   /**
@@ -780,8 +924,8 @@ export class AppointmentsService {
    * A medical record must exist before an appointment
    * can be marked as completed.
    */
-  async complete(clinicId: string, id: string) {
-    return this.prisma.$transaction(async (tx) => {
+  async complete(clinicId: string, id: string, actorId: string) {
+    const result = await this.prisma.$transaction(async (tx) => {
       const appointment = await tx.appointment.findFirst({
         where: {
           id,
@@ -852,15 +996,37 @@ export class AppointmentsService {
         include: this.appointmentInclude(),
       });
 
-      return this.toResponse(updatedAppointment);
+      return {
+        response: this.toResponse(updatedAppointment),
+        appointmentId: updatedAppointment.id,
+        appointmentNumber: updatedAppointment.appointmentNumber,
+        previousStatus: appointment.status,
+        newStatus: updatedAppointment.status,
+      };
     });
+
+    await this.auditService.create({
+      clinicId,
+      actorId,
+      action: 'UPDATE',
+      entityType: 'Appointment',
+      entityId: result.appointmentId,
+      description: 'Appointment completed',
+      metadata: {
+        appointmentNumber: result.appointmentNumber,
+        previousStatus: result.previousStatus,
+        newStatus: result.newStatus,
+      },
+    });
+
+    return result.response;
   }
 
   /**
    * Mark appointment as no-show.
    */
-  async markNoShow(clinicId: string, id: string) {
-    return this.changeStatus(clinicId, id, AppointmentStatus.NO_SHOW);
+  async markNoShow(clinicId: string, id: string, actorId: string) {
+    return this.changeStatus(clinicId, id, AppointmentStatus.NO_SHOW, actorId);
   }
 
   async getConsultation(
@@ -1300,6 +1466,7 @@ export class AppointmentsService {
     clinicId: string,
     id: string,
     status: AppointmentStatus,
+    actorId: string,
   ) {
     const appointment = await this.prisma.appointment.findFirst({
       where: {
@@ -1324,6 +1491,20 @@ export class AppointmentsService {
       },
 
       include: this.appointmentInclude(),
+    });
+
+    await this.auditService.create({
+      clinicId,
+      actorId,
+      action: 'UPDATE',
+      entityType: 'Appointment',
+      entityId: updated.id,
+      description: `Appointment status changed to ${updated.status}`,
+      metadata: {
+        appointmentNumber: updated.appointmentNumber,
+        previousStatus: appointment.status,
+        newStatus: updated.status,
+      },
     });
 
     return this.toResponse(updated);
@@ -1385,6 +1566,56 @@ export class AppointmentsService {
 
     if (end <= start) {
       throw new BadRequestException('endTime must be after startTime');
+    }
+  }
+
+  private async getClinicWorkingHours(clinicId: string) {
+    const row = await this.prisma.clinicWorkingHours.upsert({
+      where: { clinicId },
+      create: { clinicId },
+      update: {},
+    });
+    return {
+      openingTime: row.openingTime,
+      closingTime: row.closingTime,
+      defaultAppointmentDuration: row.defaultAppointmentDuration,
+      workingDays: row.workingDays.split(',').filter(Boolean),
+    };
+  }
+
+  private isClinicWorkingDay(hours: { workingDays: string[] }, date: Date) {
+    const names = [
+      'SUNDAY',
+      'MONDAY',
+      'TUESDAY',
+      'WEDNESDAY',
+      'THURSDAY',
+      'FRIDAY',
+      'SATURDAY',
+    ];
+    return hours.workingDays.includes(names[date.getDay()]);
+  }
+
+  private validateAgainstClinicHours(
+    hours: { openingTime: string; closingTime: string; workingDays: string[] },
+    date: Date,
+    startTime: string,
+    endTime: string,
+  ) {
+    if (!this.isClinicWorkingDay(hours, date)) {
+      throw new BadRequestException('Clinic is closed on the selected day');
+    }
+    if (
+      !this.isTimeWithinSchedule(
+        startTime,
+        endTime,
+        hours.openingTime,
+        hours.closingTime,
+      )
+    ) {
+      throw new BadRequestException(
+        `Appointment must be within clinic hours ${hours.openingTime}-${hours.closingTime}`,
+      );
     }
   }
 

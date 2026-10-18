@@ -15,6 +15,7 @@ import type { PermissionCode } from '../constants/permission-codes';
 interface AuthenticatedUser {
   id: string;
   clinicId: string;
+  isPlatformAdmin?: boolean;
 }
 
 interface AuthenticatedRequest {
@@ -51,6 +52,12 @@ export class PermissionsGuard implements CanActivate {
 
     if (!user.id) {
       throw new UnauthorizedException('Invalid authenticated user.');
+    }
+
+    // Platform-wide authority is granted only by the persisted User flag,
+    // hydrated by JwtStrategy from the database—not by a clinic role code.
+    if (user.isPlatformAdmin === true) {
+      return true;
     }
 
     if (!user.clinicId) {

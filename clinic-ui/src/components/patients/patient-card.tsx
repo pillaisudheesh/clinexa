@@ -73,7 +73,7 @@ export function PatientCard({ patient, onView, onEdit }: PatientCardProps) {
           <Button
             variant="ghost"
             size="sm"
-            className="text-clinexa-700"
+            className="text-samaroot-700"
             onClick={() => onView(patient)}
           >
             View

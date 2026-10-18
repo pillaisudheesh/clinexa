@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return currentUser;
     } catch (error) {
-      console.error("Unable to restore Clinexa session.", error);
+      console.error("Unable to restore SamaRoot session.", error);
 
       /*
        * A 401 means the token is no longer valid.
@@ -91,7 +91,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const hasRole = useCallback(
     (role: string) => {
-      return Boolean(user?.roles.includes(role));
+      const normalize = (value: string) =>
+        value
+          .trim()
+          .toUpperCase()
+          .replace(/[\s-]+/g, "_");
+      const requestedRole = normalize(role);
+      const aliases: Record<string, string[]> = {
+        SUPER_ADMIN: ["SUPER_ADMINISTRATOR"],
+        CLINIC_ADMIN: ["CLINIC_ADMINISTRATOR"],
+      };
+      const accepted = [requestedRole, ...(aliases[requestedRole] ?? [])];
+      const assignedRoles = [user?.role, ...(user?.roles ?? [])].flatMap(
+        (assigned) => {
+          if (typeof assigned === "string") return [normalize(assigned)];
+          if (assigned && typeof assigned === "object") {
+            return [assigned.code, assigned.name]
+              .filter((value): value is string => typeof value === "string")
+              .map(normalize);
+          }
+          return [];
+        },
+      );
+      return accepted.some((value) => assignedRoles.includes(value));
     },
     [user],
   );
@@ -103,12 +125,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user],
   );
 
-  const logout = useCallback(() => {
-    authService.logout();
-
-    setUser(null);
-
-    window.location.href = "/login";
+  const logout = useCallback(async () => {
+    try {
+      await authService.logout();
+    } catch (error) {
+      console.error("Unable to record logout in audit trail.", error);
+    } finally {
+      setUser(null);
+      window.location.href = "/login";
+    }
   }, []);
 
   const value = useMemo(

@@ -32,6 +32,7 @@ import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { PlatformAdminGuard } from '../auth/guards/platform-admin.guard';
 
 import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 import { PermissionCodes } from '../auth/constants/permission-codes';
@@ -39,7 +40,7 @@ import { PermissionCodes } from '../auth/constants/permission-codes';
 @Controller('clinics')
 @ApiTags('Clinics')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PlatformAdminGuard, PermissionsGuard)
 export class ClinicsController {
   constructor(private readonly clinicsService: ClinicsService) {}
 
@@ -51,7 +52,7 @@ export class ClinicsController {
   @Permissions(PermissionCodes.CLINIC_CREATE)
   @ApiOperation({
     summary: 'Create a clinic',
-    description: 'Creates a new clinic.',
+    description: 'Creates a new clinic. Platform Administrator access is required.',
   })
   @ApiResponse({
     status: 201,
@@ -89,7 +90,7 @@ export class ClinicsController {
   @Permissions(PermissionCodes.CLINIC_READ)
   @ApiOperation({
     summary: 'Get all clinics',
-    description: 'Returns a paginated list of clinics.',
+    description: 'Returns a paginated list of clinics. Platform Administrator access is required to view clinics across the platform.',
   })
   @ApiOkResponse({
     description: 'Clinics retrieved successfully.',
@@ -117,7 +118,7 @@ export class ClinicsController {
   @Permissions(PermissionCodes.CLINIC_READ)
   @ApiOperation({
     summary: 'Get clinic by ID',
-    description: 'Returns a single clinic by its ID.',
+    description: 'Returns a single clinic by its ID. Platform Administrator access is required for cross-clinic access.',
   })
   @ApiResponse({
     status: 200,
@@ -150,7 +151,7 @@ export class ClinicsController {
   @Permissions(PermissionCodes.CLINIC_UPDATE)
   @ApiOperation({
     summary: 'Update clinic',
-    description: 'Updates clinic information.',
+    description: 'Updates clinic information. Platform Administrator access is required.',
   })
   @ApiResponse({
     status: 200,
@@ -193,7 +194,7 @@ export class ClinicsController {
   @ApiOperation({
     summary: 'Activate or deactivate a clinic',
     description:
-      'Updates the active status of a clinic without deleting the clinic.',
+      'Updates the active status of a clinic without deleting the clinic. Platform Administrator access is required.',
   })
   @ApiResponse({
     status: 200,

@@ -1,13 +1,13 @@
-# Clinexa Documentation Roadmap
+# SamaRoot Documentation Roadmap
 
 **Document Version:** 1.0 (Draft)
-**Product:** Clinexa
+**Product:** SamaRoot
 
 ---
 
 # 1. Purpose
 
-This document defines the documentation structure for the Clinexa platform.
+This document defines the documentation structure for the SamaRoot platform.
 
 The goal is to ensure that every architectural, functional, and operational aspect of the product is documented before and during development. The documentation serves as a reference for developers, architects, testers, product owners, and future contributors.
 
@@ -17,7 +17,7 @@ Documentation is considered a first-class deliverable of the project and should 
 
 # 2. Documentation Principles
 
-The Clinexa documentation follows these principles:
+The SamaRoot documentation follows these principles:
 
 * Documentation is maintained alongside the codebase.
 * Every major architectural decision is recorded.
@@ -31,7 +31,7 @@ The Clinexa documentation follows these principles:
 # 3. Documentation Structure
 
 ```text
-clinexa-docs/
+samaroot-docs/
 │
 ├── README.md
 │
@@ -238,7 +238,7 @@ Version history should be maintained within each document.
 
 # 14. Documentation Goals
 
-The Clinexa documentation aims to:
+The SamaRoot documentation aims to:
 
 * Provide a single source of truth.
 * Reduce ambiguity during development.
@@ -252,7 +252,7 @@ The Clinexa documentation aims to:
 
 # Documentation Philosophy
 
-Clinexa treats documentation as a core engineering asset rather than an afterthought.
+SamaRoot treats documentation as a core engineering asset rather than an afterthought.
 
 Every significant architectural, functional, and operational decision should be documented, reviewed, and maintained alongside the source code. Documentation should explain not only **what** has been built, but also **why** design decisions were made.
 

@@ -50,6 +50,13 @@ export interface Doctor {
 
   languages: DoctorReference[];
 
+  consultationFee?: string;
+  followUpFee?: string;
+  emergencyFee?: string;
+  teleConsultationFee?: string;
+  schedule?: Array<{ dayOfWeek: number; startTime: string; endTime: string; isAvailable: boolean }>;
+  slotDuration?: number;
+
   isActive: boolean;
 
   createdAt: string;
@@ -103,6 +110,14 @@ export interface CreateDoctorRequest {
   employmentType: EmploymentType;
 
   biography?: string;
+  consultationFee: number;
+  followUpFee?: number;
+  emergencyFee?: number;
+  teleConsultationFee?: number;
+  scheduleDays?: number[];
+  scheduleStartTime?: string;
+  scheduleEndTime?: string;
+  slotDuration?: number;
 }
 
 export type UpdateDoctorRequest = Partial<CreateDoctorRequest>;

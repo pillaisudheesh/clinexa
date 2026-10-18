@@ -25,14 +25,14 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           collapsed ? "justify-center" : "gap-3",
         )}
       >
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-clinexa-700 text-white shadow-sm">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-samaroot-700 text-white shadow-sm">
           <HeartPulse className="size-5" />
         </div>
 
         {!collapsed && (
           <div className="min-w-0">
             <p className="truncate text-base font-semibold text-slate-900">
-              Clinexa
+              SamaRoot
             </p>
 
             <p className="truncate text-xs text-slate-500">Healthcare</p>
@@ -95,8 +95,8 @@ function NavigationSection({ items, collapsed }: NavigationSectionProps) {
                 "flex h-10 items-center rounded-lg text-sm font-medium transition-colors",
                 collapsed ? "justify-center" : "gap-3 px-3",
                 isActive
-                  ? "bg-clinexa-50 text-clinexa-700"
-                  : "text-slate-600 hover:bg-clinexa-50 hover:text-clinexa-700",
+                  ? "bg-samaroot-50 text-samaroot-700"
+                  : "text-slate-600 hover:bg-samaroot-50 hover:text-samaroot-700",
               )
             }
             title={collapsed ? item.label : undefined}

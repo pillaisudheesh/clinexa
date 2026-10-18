@@ -1,7 +1,7 @@
-# Clinexa Frontend Development Guide
+# SamaRoot Frontend Development Guide
 
 **Document Version:** 1.0 (Draft)
-**Product:** Clinexa
+**Product:** SamaRoot
 
 ---
 
@@ -32,7 +32,7 @@
 
 # 1. Purpose
 
-This document defines the frontend architecture and development standards for Clinexa.
+This document defines the frontend architecture and development standards for SamaRoot.
 
 Its purpose is to ensure consistency, maintainability, scalability, and a predictable development experience across all React modules.
 
@@ -57,7 +57,7 @@ Its purpose is to ensure consistency, maintainability, scalability, and a predic
 
 # 3. Frontend Architecture
 
-Clinexa follows a **feature-first architecture**.
+SamaRoot follows a **feature-first architecture**.
 
 Business functionality is organized into self-contained modules instead of technical layers.
 
@@ -409,7 +409,7 @@ Recommended workflow:
 
 # Frontend Development Principles
 
-The Clinexa frontend should be:
+The SamaRoot frontend should be:
 
 * Modular
 * Responsive

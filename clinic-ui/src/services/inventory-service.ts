@@ -6,6 +6,7 @@ import type {
   InventoryTransaction,
   Paginated,
   StockReceipt,
+  AdjustStockRequest,
 } from "@/types/inventory";
 
 export const inventoryService = {
@@ -66,19 +67,25 @@ export const inventoryService = {
   },
 
   async getLowStock(): Promise<InventoryBatch[]> {
-    const response = await apiClient.get<InventoryBatch[]>("/inventory/low-stock");
+    const response = await apiClient.get<InventoryBatch[]>(
+      "/inventory/low-stock",
+    );
     return response.data;
   },
 
   async getExpiring(days = 90): Promise<InventoryBatch[]> {
-    const response = await apiClient.get<InventoryBatch[]>("/inventory/expiring", {
-      params: { days },
-    });
+    const response = await apiClient.get<InventoryBatch[]>(
+      "/inventory/expiring",
+      {
+        params: { days },
+      },
+    );
     return response.data;
   },
 
   async getExpired(): Promise<InventoryBatch[]> {
-    const response = await apiClient.get<InventoryBatch[]>("/inventory/expired");
+    const response =
+      await apiClient.get<InventoryBatch[]>("/inventory/expired");
     return response.data;
   },
 
@@ -92,6 +99,16 @@ export const inventoryService = {
   async createReceipt(data: CreateStockReceiptRequest): Promise<StockReceipt> {
     const response = await apiClient.post<StockReceipt>(
       "/inventory/receipts",
+      data,
+    );
+    return response.data;
+  },
+  async adjustStock(
+    id: string,
+    data: { quantity: number; notes: string },
+  ): Promise<InventoryBatch> {
+    const response = await apiClient.patch<InventoryBatch>(
+      `/inventory/batches/${id}/stock`,
       data,
     );
     return response.data;

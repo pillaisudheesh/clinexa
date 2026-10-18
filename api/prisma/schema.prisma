@@ -137,6 +137,9 @@ model Clinic {
 
   code String @unique
   name String
+  logoUrl String? @db.Text
+  tagline String?
+  brandColor String? @default("#0F766E")
 
   email   String?
   phone   String?
@@ -156,6 +159,7 @@ model Clinic {
 
   users User[]
   roles Role[]
+  workingHours ClinicWorkingHours?
 
   patients    Patient[]
   departments Department[]
@@ -178,6 +182,20 @@ model Clinic {
   @@index([isActive])
 }
 
+
+model ClinicWorkingHours {
+  id String @id @default(uuid())
+  clinicId String @unique
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  openingTime String @default("09:00")
+  closingTime String @default("18:00")
+  defaultAppointmentDuration Int @default(30)
+  // Comma-separated uppercase weekdays: MONDAY,TUESDAY,...
+  workingDays String @default("MONDAY,TUESDAY,WEDNESDAY,THURSDAY,FRIDAY,SATURDAY")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model User {
   id String @id @default(uuid())
 
@@ -192,6 +210,9 @@ model User {
   passwordHash String
 
   status UserStatus @default(ACTIVE)
+
+  // Platform-wide authority is explicit and independent of clinic role codes.
+  isPlatformAdmin Boolean @default(false)
 
   roles UserRole[]
 
@@ -1177,4 +1198,21 @@ model StockReceiptItem {
   @@index([receiptId])
   @@index([medicineId])
   @@index([medicineBatchId])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  clinicId    String?
+  userId      String?
+  action      String
+  entity      String?
+  entityId    String?
+  details     Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([clinicId, createdAt])
+  @@index([userId, createdAt])
+  @@map("audit_logs")
 }

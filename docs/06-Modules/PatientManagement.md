@@ -461,7 +461,7 @@ Potential future capabilities:
 
 # Module Principles
 
-The Patient Management module is the authoritative source for patient demographic information within Clinexa.
+The Patient Management module is the authoritative source for patient demographic information within SamaRoot.
 
 It must provide:
 
@@ -471,4 +471,4 @@ It must provide:
 * Seamless integration with all clinical workflows
 * Complete auditability of patient data changes
 
-> **Every clinical interaction in Clinexa begins with a trusted patient record. The quality, integrity, and accessibility of patient data directly influence the safety and efficiency of care delivered through the platform.**
+> **Every clinical interaction in SamaRoot begins with a trusted patient record. The quality, integrity, and accessibility of patient data directly influence the safety and efficiency of care delivered through the platform.**

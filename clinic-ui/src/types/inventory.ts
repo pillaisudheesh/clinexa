@@ -99,3 +99,8 @@ export interface Paginated<T> {
   limit: number;
   totalPages: number;
 }
+
+export interface AdjustStockRequest {
+  quantity: number;
+  notes: string;
+}

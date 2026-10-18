@@ -31,7 +31,7 @@ export function MobileNavigation({
               <HeartPulse className="size-5" />
             </div>
 
-            <span>Clinexa</span>
+            <span>SamaRoot</span>
           </SheetTitle>
         </SheetHeader>
 
@@ -48,8 +48,8 @@ export function MobileNavigation({
                   cn(
                     "flex h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-clinexa-50 text-clinexa-700"
-                      : "text-slate-600 hover:bg-clinexa-50 hover:text-clinexa-700",
+                      ? "bg-samaroot-50 text-samaroot-700"
+                      : "text-slate-600 hover:bg-samaroot-50 hover:text-samaroot-700",
                   )
                 }
               >

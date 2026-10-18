@@ -621,62 +621,50 @@ export function PatientProfilePage() {
         {/* Profile header */}
         <section
           className="
-          overflow-hidden
-          rounded-2xl
-          bg-white
-          shadow-[0_8px_30px_rgba(15,23,42,0.045)]
-          ring-1
-          ring-slate-200/60
-        "
+    overflow-hidden
+    rounded-2xl
+    bg-white
+    shadow-[0_8px_30px_rgba(15,23,42,0.045)]
+    ring-1
+    ring-slate-200/60
+  "
         >
           <div className="p-5 sm:p-6">
-            <div
-              className="
-              flex
-              flex-col
-              gap-5
-              sm:flex-row
-              sm:items-center
-              sm:justify-between
-            "
-            >
-              <div className="flex min-w-0 items-center gap-4">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+              {/* Patient identity */}
+              <div className="flex min-w-0 items-start gap-3 sm:items-center sm:gap-4">
                 <div
                   className="
-                  flex
-                  size-16
-                  shrink-0
-                  items-center
-                  justify-center
-                  rounded-2xl
-                  bg-teal-50
-                  text-lg
-                  font-semibold
-                  text-teal-700
-                  ring-1
-                  ring-teal-100
-                "
+            flex
+            size-14
+            shrink-0
+            items-center
+            justify-center
+            rounded-2xl
+            bg-teal-50
+            text-base
+            font-semibold
+            text-teal-700
+            ring-1
+            ring-teal-100
+            sm:size-16
+            sm:text-lg
+          "
                 >
                   {getInitials(patient)}
                 </div>
 
-                <div className="min-w-0">
-                  <div
-                    className="
-                    flex
-                    flex-wrap
-                    items-center
-                    gap-2
-                  "
-                  >
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
                     <h1
                       className="
-                      truncate
-                      text-xl
-                      font-semibold
-                      tracking-tight
-                      text-slate-900
-                    "
+                min-w-0
+                text-lg
+                font-semibold
+                tracking-tight
+                text-slate-900
+                sm:text-xl
+              "
                     >
                       {patient.fullName}
                     </h1>
@@ -686,30 +674,29 @@ export function PatientProfilePage() {
 
                   <div
                     className="
-                    mt-1.5
-                    flex
-                    flex-wrap
-                    items-center
-                    gap-x-2
-                    gap-y-1
-                    text-xs
-                    text-slate-400
-                  "
+              mt-1.5
+              flex
+              flex-wrap
+              items-center
+              gap-x-2
+              gap-y-1
+              text-xs
+              text-slate-400
+            "
                   >
                     <span>{patient.patientNumber}</span>
 
-                    <span>·</span>
+                    <span className="text-slate-300">·</span>
 
                     <span>{getGenderLabel(patient.gender)}</span>
 
-                    <span>·</span>
+                    <span className="text-slate-300">·</span>
 
                     <span>{patient.age} years</span>
 
                     {patient.bloodGroup && (
                       <>
-                        <span>·</span>
-
+                        <span className="text-slate-300">·</span>
                         <span>{getBloodGroupLabel(patient.bloodGroup)}</span>
                       </>
                     )}
@@ -717,70 +704,97 @@ export function PatientProfilePage() {
                 </div>
               </div>
 
-              {canUpdate && (
-                <div
+              {/* Actions */}
+              <div className="grid w-full grid-cols-1 gap-2 sm:w-auto sm:flex sm:flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => navigate(`/patients/${patient.id}/360`)}
                   className="
-                  flex
-                  flex-wrap
-                  gap-2
-                "
+            inline-flex
+            h-10
+            w-full
+            items-center
+            justify-center
+            gap-2
+            rounded-xl
+            bg-teal-50
+            px-4
+            text-xs
+            font-semibold
+            text-teal-700
+            ring-1
+            ring-teal-100
+            transition-colors
+            hover:bg-teal-100
+            sm:w-auto
+          "
                 >
-                  <button
-                    type="button"
-                    onClick={handleStartEdit}
-                    className="
-                    inline-flex
-                    h-10
-                    items-center
-                    justify-center
-                    gap-2
-                    rounded-xl
-                    bg-slate-50
-                    px-4
-                    text-xs
-                    font-semibold
-                    text-slate-600
-                    ring-1
-                    ring-slate-200/60
-                    transition-colors
-                    hover:bg-slate-100
-                  "
-                  >
-                    <Edit3 size={15} />
-                    Edit patient
-                  </button>
+                  Patient 360
+                </button>
 
-                  <button
-                    type="button"
-                    disabled={statusUpdating}
-                    onClick={handleToggleStatus}
-                    className={`
-                    inline-flex
-                    h-10
-                    items-center
-                    justify-center
-                    rounded-xl
-                    px-4
-                    text-xs
-                    font-semibold
-                    transition-colors
-                    disabled:cursor-not-allowed
-                    disabled:opacity-50
-                    ${
-                      patient.isActive
-                        ? "bg-red-50 text-red-600 hover:bg-red-100"
-                        : "bg-teal-50 text-teal-700 hover:bg-teal-100"
-                    }
-                  `}
-                  >
-                    {statusUpdating
-                      ? "Updating..."
-                      : patient.isActive
-                        ? "Deactivate"
-                        : "Activate"}
-                  </button>
-                </div>
-              )}
+                {canUpdate && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleStartEdit}
+                      className="
+                inline-flex
+                h-10
+                w-full
+                items-center
+                justify-center
+                gap-2
+                rounded-xl
+                bg-slate-50
+                px-4
+                text-xs
+                font-semibold
+                text-slate-600
+                ring-1
+                ring-slate-200/60
+                transition-colors
+                hover:bg-slate-100
+                sm:w-auto
+              "
+                    >
+                      <Edit3 size={15} />
+                      Edit patient
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={statusUpdating}
+                      onClick={handleToggleStatus}
+                      className={`
+                inline-flex
+                h-10
+                w-full
+                items-center
+                justify-center
+                rounded-xl
+                px-4
+                text-xs
+                font-semibold
+                transition-colors
+                disabled:cursor-not-allowed
+                disabled:opacity-50
+                sm:w-auto
+                ${
+                  patient.isActive
+                    ? "bg-red-50 text-red-600 hover:bg-red-100"
+                    : "bg-teal-50 text-teal-700 hover:bg-teal-100"
+                }
+              `}
+                    >
+                      {statusUpdating
+                        ? "Updating..."
+                        : patient.isActive
+                          ? "Deactivate"
+                          : "Activate"}
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </section>

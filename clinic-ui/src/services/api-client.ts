@@ -2,7 +2,6 @@ import axios from "axios";
 
 export const apiClient = axios.create({
   baseURL: "/api/v1",
-
   headers: {
     "Content-Type": "application/json",
   },
@@ -10,10 +9,15 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("clinexa_access_token");
+    const token = localStorage.getItem("samaroot_access_token");
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    // Allow Axios/browser to set multipart/form-data with its boundary.
+    if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+      config.headers.delete("Content-Type");
     }
 
     return config;
@@ -23,13 +27,10 @@ apiClient.interceptors.request.use(
 
 apiClient.interceptors.response.use(
   (response) => response,
-
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem("clinexa_access_token");
-
-      localStorage.removeItem("clinexa_user");
-
+      localStorage.removeItem("samaroot_access_token");
+      localStorage.removeItem("samaroot_user");
       window.location.href = "/login";
     }
 

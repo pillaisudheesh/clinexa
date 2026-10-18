@@ -1,9 +1,9 @@
-# Clinexa System Architecture
+# SamaRoot System Architecture
 
 **Document Version:** 1.0 (Draft)
-**Product:** Clinexa
+**Product:** SamaRoot
 **Architecture Style:** Modular Monolith
-**Prepared By:** Clinexa Product Team
+**Prepared By:** SamaRoot Product Team
 
 ---
 
@@ -31,7 +31,7 @@
 
 # 1. Purpose
 
-This document defines the overall system architecture for Clinexa.
+This document defines the overall system architecture for SamaRoot.
 
 It describes the architectural style, major components, communication patterns, security model, deployment strategy, and design principles that guide the development of the platform.
 
@@ -106,7 +106,7 @@ Architecture, APIs, database design, and operational decisions should be maintai
 
 # 4. System Overview
 
-Clinexa is implemented as a cloud-ready modular monolith.
+SamaRoot is implemented as a cloud-ready modular monolith.
 
 The application consists of:
 
@@ -223,7 +223,7 @@ Modules communicate through services rather than directly accessing each other's
 
 # 8. Database Architecture
 
-Clinexa uses PostgreSQL with Prisma ORM.
+SamaRoot uses PostgreSQL with Prisma ORM.
 
 Key characteristics:
 
@@ -278,7 +278,7 @@ Business Logic
 
 # 10. Multi-Tenant Architecture
 
-Clinexa uses a shared database with tenant isolation.
+SamaRoot uses a shared database with tenant isolation.
 
 Each tenant-specific record includes a `clinicId`.
 
@@ -295,7 +295,7 @@ Benefits:
 
 # 11. API Architecture
 
-Clinexa exposes REST APIs.
+SamaRoot exposes REST APIs.
 
 API principles:
 
@@ -348,7 +348,7 @@ Each module should be independently testable and maintain clear ownership of its
 
 # 13. Security Architecture
 
-Clinexa follows a defense-in-depth approach.
+SamaRoot follows a defense-in-depth approach.
 
 Security measures include:
 
@@ -454,4 +454,4 @@ These capabilities should build upon the existing modular architecture without r
 * Treat documentation as part of the product.
 * Design with future growth in mind, while avoiding unnecessary complexity in the present.
 
-> **Clinexa is designed as a cloud-native, secure, and extensible outpatient clinic platform where modular design, tenant isolation, and maintainability are foundational architectural principles.**
+> **SamaRoot is designed as a cloud-native, secure, and extensible outpatient clinic platform where modular design, tenant isolation, and maintainability are foundational architectural principles.**

@@ -4,278 +4,96 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
-  Req,
   UseGuards,
 } from '@nestjs/common';
 
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiParam,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
-import { Request } from 'express';
-
+import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
+import { PermissionCodes } from '../auth/constants/permission-codes';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 
+import { DoctorsService } from './doctors.service';
 import { CreateDoctorDto } from './dto/create-doctor.dto';
-import { DoctorQueryDto } from './dto/doctor-query.dto';
-import { DoctorResponseDto } from './dto/doctor-response.dto';
 import { UpdateDoctorDto } from './dto/update-doctor.dto';
 import { UpdateDoctorStatusDto } from './dto/update-doctor-status.dto';
-
-import { DoctorsService } from './doctors.service';
-
-interface AuthenticatedRequest extends Request {
-  user: {
-    id: string;
-    clinicId: string;
-  };
-}
+import { DoctorQueryDto } from './dto/doctor-query.dto';
+import { DoctorResponseDto } from './dto/doctor-response.dto';
 
 @ApiTags('Doctors')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('doctors')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class DoctorsController {
   constructor(private readonly doctorsService: DoctorsService) {}
 
-  // ===========================================================================
-  // CREATE
-  // ===========================================================================
-
-  @Post()
-  @Permissions('DOCTOR_CREATE')
-  @ApiOperation({
-    summary: 'Create a doctor',
-  })
-  @ApiResponse({
-    status: 201,
-    description: 'Doctor created successfully.',
-    type: DoctorResponseDto,
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Invalid doctor data.',
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Authentication required.',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Insufficient permissions.',
-  })
-  @ApiResponse({
-    status: 409,
-    description: 'Doctor already exists.',
-  })
-  async create(
-    @Req() req: AuthenticatedRequest,
-    @Body() dto: CreateDoctorDto,
-  ): Promise<DoctorResponseDto> {
-    return this.doctorsService.create(req.user.clinicId, dto);
-  }
-
-  // ===========================================================================
-  // LIST
-  // ===========================================================================
-
   @Get()
-  @Permissions('DOCTOR_READ')
-  @ApiOperation({
-    summary: 'Get doctors',
-    description:
-      'Returns a paginated list of doctors belonging to the authenticated clinic.',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Doctors retrieved successfully.',
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Authentication required.',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Insufficient permissions.',
-  })
-  async findAll(
-    @Req() req: AuthenticatedRequest,
+  @Permissions(PermissionCodes.DOCTOR_READ)
+  @ApiOperation({ summary: 'Get Doctors' })
+  findAll(
+    @CurrentUser() user: AuthenticatedUser,
     @Query() query: DoctorQueryDto,
   ) {
-    console.log('DOCTORS CONTROLLER START');
-    console.log('clinicId:', req.user.clinicId);
-    console.log('query:', query);
-    const result = await this.doctorsService.findAll(req.user.clinicId, query);
-    console.log('DOCTORS CONTROLLER END');
-
-    return result;
+    return this.doctorsService.findAll(user.clinicId, query);
   }
-
-  // ===========================================================================
-  // GET BY ID
-  // ===========================================================================
 
   @Get(':id')
-  @Permissions('DOCTOR_READ')
-  @ApiOperation({
-    summary: 'Get doctor by ID',
-  })
-  @ApiParam({
-    name: 'id',
-    description: 'Doctor ID',
-    type: String,
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Doctor retrieved successfully.',
-    type: DoctorResponseDto,
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Authentication required.',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Insufficient permissions.',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Doctor not found.',
-  })
-  async findOne(
-    @Req() req: AuthenticatedRequest,
-    @Param('id') id: string,
+  @Permissions(PermissionCodes.DOCTOR_READ)
+  @ApiOperation({ summary: 'Get Doctor' })
+  findOne(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<DoctorResponseDto> {
-    return this.doctorsService.findOne(req.user.clinicId, id);
+    return this.doctorsService.findOne(user.clinicId, id);
   }
 
-  // ===========================================================================
-  // UPDATE
-  // ===========================================================================
+  @Post()
+  @Permissions(PermissionCodes.DOCTOR_CREATE)
+  @ApiOperation({ summary: 'Create Doctor' })
+  create(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateDoctorDto,
+  ): Promise<DoctorResponseDto> {
+    return this.doctorsService.create(user.clinicId, dto, user.id);
+  }
 
   @Patch(':id')
-  @Permissions('DOCTOR_UPDATE')
-  @ApiOperation({
-    summary: 'Update doctor',
-  })
-  @ApiParam({
-    name: 'id',
-    description: 'Doctor ID',
-    type: String,
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Doctor updated successfully.',
-    type: DoctorResponseDto,
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Invalid doctor data.',
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Authentication required.',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Insufficient permissions.',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Doctor not found.',
-  })
-  @ApiResponse({
-    status: 409,
-    description: 'Doctor already exists.',
-  })
-  async update(
-    @Req() req: AuthenticatedRequest,
-    @Param('id') id: string,
+  @Permissions(PermissionCodes.DOCTOR_UPDATE)
+  @ApiOperation({ summary: 'Update Doctor' })
+  update(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateDoctorDto,
   ): Promise<DoctorResponseDto> {
-    return this.doctorsService.update(req.user.clinicId, id, dto);
+    return this.doctorsService.update(user.clinicId, id, dto, user.id);
   }
 
-  // ===========================================================================
-  // UPDATE STATUS
-  // ===========================================================================
-
-  @Patch(':id/status')
-  @Permissions('DOCTOR_UPDATE')
-  @ApiOperation({
-    summary: 'Activate or deactivate doctor',
-  })
-  @ApiParam({
-    name: 'id',
-    description: 'Doctor ID',
-    type: String,
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Doctor status updated successfully.',
-    type: DoctorResponseDto,
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Authentication required.',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Insufficient permissions.',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Doctor not found.',
-  })
-  async updateStatus(
-    @Req() req: AuthenticatedRequest,
-    @Param('id') id: string,
+  @Put(':id/status')
+  @Permissions(PermissionCodes.DOCTOR_UPDATE)
+  @ApiOperation({ summary: 'Activate / Deactivate Doctor' })
+  updateStatus(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateDoctorStatusDto,
   ): Promise<DoctorResponseDto> {
-    return this.doctorsService.updateStatus(req.user.clinicId, id, dto);
+    return this.doctorsService.updateStatus(user.clinicId, id, dto, user.id);
   }
 
-  // ===========================================================================
-  // DELETE / SOFT DELETE
-  // ===========================================================================
-
   @Delete(':id')
-  @Permissions('DOCTOR_DELETE')
-  @ApiOperation({
-    summary: 'Deactivate doctor',
-    description: 'Soft deletes a doctor by setting isActive to false.',
-  })
-  @ApiParam({
-    name: 'id',
-    description: 'Doctor ID',
-    type: String,
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Doctor deactivated successfully.',
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Authentication required.',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Insufficient permissions.',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Doctor not found.',
-  })
-  async remove(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
-    return this.doctorsService.remove(req.user.clinicId, id);
+  @Permissions(PermissionCodes.DOCTOR_DELETE)
+  @ApiOperation({ summary: 'Deactivate Doctor' })
+  remove(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.doctorsService.remove(user.clinicId, id, user.id);
   }
 }

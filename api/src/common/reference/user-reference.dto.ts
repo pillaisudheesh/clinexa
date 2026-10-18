@@ -15,7 +15,7 @@ export class UserReferenceDto {
   lastName!: string;
 
   @ApiProperty({
-    example: 'john.doe@clinexa.com',
+    example: 'john.doe@samaroot.com',
   })
   email!: string;
 }

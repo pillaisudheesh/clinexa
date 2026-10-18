@@ -24,6 +24,8 @@ export const doctorInclude = Prisma.validator<Prisma.DoctorInclude>()({
   },
 
   registrationCouncil: true,
+  consultationFee: true,
+  schedule: { include: { slots: true } },
 });
 
 export type DoctorWithRelations = Prisma.DoctorGetPayload<{

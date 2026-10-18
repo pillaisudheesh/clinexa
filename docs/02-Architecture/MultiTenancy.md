@@ -1,7 +1,7 @@
-# Clinexa Multi-Tenant Architecture
+# SamaRoot Multi-Tenant Architecture
 
 **Document Version:** 1.0 (Draft)
-**Product:** Clinexa
+**Product:** SamaRoot
 
 ---
 
@@ -26,7 +26,7 @@
 
 # 1. Purpose
 
-This document defines the multi-tenant architecture for Clinexa.
+This document defines the multi-tenant architecture for SamaRoot.
 
 It describes how clinics are represented, isolated, secured, and managed throughout the platform.
 
@@ -36,7 +36,7 @@ The document ensures that tenant isolation is consistently implemented across th
 
 # 2. Multi-Tenant Overview
 
-Clinexa is designed as a Software-as-a-Service (SaaS) platform.
+SamaRoot is designed as a Software-as-a-Service (SaaS) platform.
 
 Each clinic is treated as an independent tenant.
 
@@ -84,7 +84,7 @@ A tenant represents one outpatient clinic.
 Example:
 
 ```text
-Clinexa Platform
+SamaRoot Platform
 
 ├── Sunrise Clinic
 ├── Family Care Clinic
@@ -337,7 +337,7 @@ Platform metrics should be aggregated without exposing one tenant's data to anot
 
 # 14. Future Evolution
 
-The current shared-schema architecture supports the expected scale of Clinexa.
+The current shared-schema architecture supports the expected scale of SamaRoot.
 
 Future enhancements may include:
 
@@ -355,7 +355,7 @@ These enhancements should be achievable without changing the application domain 
 
 # Multi-Tenant Principles
 
-Clinexa follows these principles for multi-tenancy:
+SamaRoot follows these principles for multi-tenancy:
 
 * Every clinic is treated as an independent tenant.
 * Tenant isolation is enforced at the application and database layers.
@@ -364,4 +364,4 @@ Clinexa follows these principles for multi-tenancy:
 * Tenant-specific configuration and data remain isolated throughout the system.
 * The architecture is designed to evolve from a shared-schema model to more isolated deployment models if future business needs require it.
 
-> **Tenant isolation is a foundational architectural guarantee in Clinexa. Every request, query, and business operation is designed to ensure that each clinic's data remains private, secure, and logically separated from all other tenants.**
+> **Tenant isolation is a foundational architectural guarantee in SamaRoot. Every request, query, and business operation is designed to ensure that each clinic's data remains private, secure, and logically separated from all other tenants.**

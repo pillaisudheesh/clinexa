@@ -1,10 +1,10 @@
-# Clinexa Software Requirements Specification (SRS)
+# SamaRoot Software Requirements Specification (SRS)
 
 **Document Version:** 1.0 (Draft)
-**Product Name:** Clinexa
+**Product Name:** SamaRoot
 **Tagline:** *Smarter Care. Simplified.*
 **Document Status:** Draft
-**Prepared By:** Clinexa Product Team
+**Prepared By:** SamaRoot Product Team
 **Date:** July 26, 2026
 
 ---
@@ -13,7 +13,7 @@
 
 | Version | Date          | Author               | Description   |
 | ------- | ------------- | -------------------- | ------------- |
-| 1.0     | July 26, 2026 | Clinexa Product Team | Initial draft |
+| 1.0     | July 26, 2026 | SamaRoot Product Team | Initial draft |
 
 ---
 
@@ -41,11 +41,11 @@
 
 ## 1.1 Purpose
 
-Clinexa is a cloud-based, multi-tenant outpatient clinic management platform designed to simplify the daily operations of healthcare providers.
+SamaRoot is a cloud-based, multi-tenant outpatient clinic management platform designed to simplify the daily operations of healthcare providers.
 
 The platform enables clinics to manage patients, appointments, consultations, prescriptions, billing, and reports through a secure, intuitive, and mobile-friendly application.
 
-Clinexa aims to reduce administrative effort while improving the quality of patient care through efficient digital workflows.
+SamaRoot aims to reduce administrative effort while improving the quality of patient care through efficient digital workflows.
 
 ---
 
@@ -63,7 +63,7 @@ Deliver an affordable, scalable, and user-friendly clinic management platform th
 
 # 2. Product Vision
 
-Clinexa is designed as a **Software-as-a-Service (SaaS)** platform for outpatient clinics.
+SamaRoot is designed as a **Software-as-a-Service (SaaS)** platform for outpatient clinics.
 
 The platform supports multiple independent clinics from a single deployment while ensuring complete tenant isolation and data security.
 
@@ -121,7 +121,7 @@ These may be introduced as optional modules in future releases.
 
 # 4. Business Objectives
 
-The objectives of Clinexa are:
+The objectives of SamaRoot are:
 
 * Digitize outpatient clinic operations.
 * Reduce patient waiting time.
@@ -135,7 +135,7 @@ The objectives of Clinexa are:
 
 # 5. Target Customers
 
-Clinexa is designed primarily for:
+SamaRoot is designed primarily for:
 
 * General Practice Clinics
 * Family Medicine Clinics
@@ -210,7 +210,7 @@ The primary stakeholders include:
 
 ## Super Administrator
 
-Responsible for managing the entire Clinexa platform.
+Responsible for managing the entire SamaRoot platform.
 
 Responsibilities:
 

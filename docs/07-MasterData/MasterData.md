@@ -1,8 +1,8 @@
-# Clinexa Master Data Management (MDM)
+# SamaRoot Master Data Management (MDM)
 
 **Document Version:** 1.0 (Draft)
 
-**Product:** Clinexa
+**Product:** SamaRoot
 
 ---
 
@@ -25,7 +25,7 @@
 
 # 1. Purpose
 
-Master Data Management (MDM) provides a centralized mechanism for managing reference data used throughout Clinexa.
+Master Data Management (MDM) provides a centralized mechanism for managing reference data used throughout SamaRoot.
 
 Instead of storing free-text values in transactional records, modules reference standardized master data.
 
@@ -282,7 +282,7 @@ Future capabilities may include:
 
 # Master Data Principles
 
-Master data is the authoritative source for reusable reference values across Clinexa.
+Master data is the authoritative source for reusable reference values across SamaRoot.
 
 It ensures:
 
@@ -292,4 +292,4 @@ It ensures:
 * Configurable business rules
 * Reduced duplication
 
-> **Centralized master data improves data quality, simplifies administration, and ensures that every module in Clinexa uses a consistent vocabulary and set of reference values.**
+> **Centralized master data improves data quality, simplifies administration, and ensures that every module in SamaRoot uses a consistent vocabulary and set of reference values.**

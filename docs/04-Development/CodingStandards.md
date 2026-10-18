@@ -1,7 +1,7 @@
-# Clinexa Coding Standards
+# SamaRoot Coding Standards
 
 **Document Version:** 1.0 (Draft)
-**Product:** Clinexa
+**Product:** SamaRoot
 
 ---
 
@@ -30,7 +30,7 @@
 
 # 1. Purpose
 
-This document defines the coding standards for the Clinexa platform.
+This document defines the coding standards for the SamaRoot platform.
 
 The objective is to maintain a clean, consistent, secure, and maintainable codebase across all components of the application.
 
@@ -414,7 +414,7 @@ Major architectural decisions should be recorded as ADRs.
 
 # Coding Principles Summary
 
-Every contribution to Clinexa should strive to be:
+Every contribution to SamaRoot should strive to be:
 
 * Readable
 * Consistent
@@ -426,4 +426,4 @@ Every contribution to Clinexa should strive to be:
 
 Code quality is a shared responsibility. Every pull request should improve or preserve the health of the codebase.
 
-> **Clinexa values maintainable software over clever software. Consistent coding standards enable faster development, safer changes, and a codebase that remains understandable as the platform grows.**
+> **SamaRoot values maintainable software over clever software. Consistent coding standards enable faster development, safer changes, and a codebase that remains understandable as the platform grows.**

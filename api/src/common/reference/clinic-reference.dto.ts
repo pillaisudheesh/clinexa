@@ -10,7 +10,7 @@ export class ClinicReferenceDto {
   code!: string;
 
   @ApiProperty({
-    example: 'Clinexa Medical Centre',
+    example: 'SamaRoot Medical Centre',
   })
   name!: string;
 }

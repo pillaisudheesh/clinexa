@@ -1,16 +1,19 @@
 import {
   Activity,
+  AlertTriangle,
   ArrowRight,
   CalendarDays,
   CheckCircle2,
   CheckCircle,
   Clock3,
   Eye,
+  FileText,
   FlaskConical,
   IndianRupee,
   LogIn,
   Play,
   Plus,
+  Package,
   Stethoscope,
   UsersRound,
   WalletCards,
@@ -96,7 +99,7 @@ function statusClass(status: string) {
 }
 
 export function DashboardPage() {
-  const { user, loading: authLoading, hasPermission } = useAuth();
+  const { user, loading: authLoading, hasPermission, hasRole } = useAuth();
   const navigate = useNavigate();
 
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -115,6 +118,9 @@ export function DashboardPage() {
 
   const canUpdateAppointments = hasPermission("APPOINTMENT_UPDATE");
   const canReadMedicalRecords = hasPermission("MEDICAL_RECORD_READ");
+  const canStartConsultation =
+    (hasRole("DOCTOR") || hasRole("CLINIC_ADMIN") || hasRole("SUPER_ADMIN")) &&
+    hasPermission("CONSULTATION_START");
 
   const loadDashboard = useCallback(async (showLoader = true) => {
     if (showLoader) {
@@ -228,7 +234,11 @@ export function DashboardPage() {
   if (error) {
     return (
       <div className="space-y-6">
-        <DashboardHeader firstName={firstName} onRefresh={loadDashboard} />
+        <DashboardHeader
+          firstName={firstName}
+          onRefresh={loadDashboard}
+          canCreateAppointments={hasPermission("APPOINTMENT_CREATE")}
+        />
 
         <div
           className="
@@ -274,7 +284,11 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <DashboardHeader firstName={firstName} onRefresh={loadDashboard} />
+      <DashboardHeader
+        firstName={firstName}
+        onRefresh={loadDashboard}
+        canCreateAppointments={hasPermission("APPOINTMENT_CREATE")}
+      />
 
       {loading ? (
         <DashboardSkeleton />
@@ -288,6 +302,7 @@ export function DashboardPage() {
               canView={summary?.permissions.appointments ?? false}
               canUpdate={canUpdateAppointments}
               canReadMedicalRecords={canReadMedicalRecords}
+              canStartConsultation={canStartConsultation}
               actionLoadingId={actionLoadingId}
               actionType={actionType}
               onConfirm={(appointmentId) => {
@@ -314,13 +329,26 @@ export function DashboardPage() {
             />
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-            <RecentPatients
-              patients={summary?.recentPatients ?? []}
-              canView={summary?.permissions.patients ?? false}
-            />
+          <div
+            className={
+              summary?.permissions.patients
+                ? "grid gap-6 xl:grid-cols-[1fr_1fr]"
+                : "grid gap-6"
+            }
+          >
+            {summary?.permissions.patients && (
+              <RecentPatients
+                patients={summary.recentPatients ?? []}
+                canView
+              />
+            )}
 
             <QuickActions permissions={summary?.permissions} />
+          </div>
+
+          <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+            <RecentActivity activities={summary?.recentActivity ?? []} />
+            <OperationalAlerts summary={summary} />
           </div>
         </>
       )}
@@ -377,9 +405,11 @@ export function DashboardPage() {
 function DashboardHeader({
   firstName,
   onRefresh,
+  canCreateAppointments,
 }: {
   firstName: string;
   onRefresh: () => void;
+  canCreateAppointments: boolean;
 }) {
   function getGreeting(): string {
     const hour = new Date().getHours();
@@ -461,28 +491,30 @@ function DashboardHeader({
           Refresh
         </button>
 
-        <Link
-          to="/appointments"
-          className="
-            inline-flex
-            items-center
-            gap-2
-            rounded-xl
-            bg-teal-600
-            px-4
-            py-2.5
-            text-sm
-            font-semibold
-            text-white
-            shadow-[0_8px_20px_rgba(13,148,136,0.18)]
-            transition-all
-            hover:-translate-y-px
-            hover:bg-teal-700
-          "
-        >
-          <Plus className="size-4" />
-          New appointment
-        </Link>
+        {canCreateAppointments && (
+          <Link
+            to="/appointments"
+            className="
+              inline-flex
+              items-center
+              gap-2
+              rounded-xl
+              bg-teal-600
+              px-4
+              py-2.5
+              text-sm
+              font-semibold
+              text-white
+              shadow-[0_8px_20px_rgba(13,148,136,0.18)]
+              transition-all
+              hover:-translate-y-px
+              hover:bg-teal-700
+            "
+          >
+            <Plus className="size-4" />
+            New appointment
+          </Link>
+        )}
       </div>
     </div>
   );
@@ -519,7 +551,14 @@ function MetricGrid({ summary }: { summary: DashboardSummary | null }) {
       visible: summary?.permissions.laboratory ?? false,
     },
     {
-      label: "Collected revenue",
+      label: "Low stock batches",
+      value: summary?.metrics.lowStockBatches,
+      icon: Activity,
+      href: "/inventory",
+      visible: summary?.permissions.inventory ?? false,
+    },
+    {
+      label: "Collected today",
       value: summary?.metrics.collectedRevenue,
       icon: WalletCards,
       href: "/billing",
@@ -534,7 +573,7 @@ function MetricGrid({ summary }: { summary: DashboardSummary | null }) {
         grid
         gap-4
         sm:grid-cols-2
-        xl:grid-cols-5
+        xl:grid-cols-6
       "
     >
       {metrics.map((metric) => {
@@ -610,6 +649,7 @@ function TodayAppointments({
   canView,
   canUpdate,
   canReadMedicalRecords,
+  canStartConsultation,
   actionLoadingId,
   actionType,
   onConfirm,
@@ -622,6 +662,7 @@ function TodayAppointments({
   canView: boolean;
   canUpdate: boolean;
   canReadMedicalRecords: boolean;
+  canStartConsultation: boolean;
   actionLoadingId: string | null;
   actionType: "check-in" | "start" | "confirm" | null;
   onConfirm: (appointmentId: string) => void;
@@ -832,7 +873,7 @@ function TodayAppointments({
                       </button>
                     )}
 
-                    {isCheckedIn && (
+                    {isCheckedIn && canStartConsultation && (
                       <button
                         type="button"
                         disabled={Boolean(actionLoadingId)}
@@ -868,7 +909,7 @@ function TodayAppointments({
                   </div>
                 )}
 
-                {isInConsultation && (
+                {isInConsultation && canStartConsultation && (
                   <div className="mt-3 flex justify-end">
                     <button
                       type="button"
@@ -1300,6 +1341,152 @@ function RecentPatients({
   );
 }
 
+function RecentActivity({
+  activities,
+}: {
+  activities: DashboardSummary["recentActivity"];
+}) {
+  const icons = {
+    PATIENT: UsersRound,
+    APPOINTMENT: CalendarDays,
+    PAYMENT: WalletCards,
+    LAB: FlaskConical,
+    INVENTORY: Package,
+  } as const;
+
+  return (
+    <section className="overflow-hidden rounded-2xl bg-white shadow-[0_8px_30px_rgba(15,23,42,0.045)] ring-1 ring-slate-200/60">
+      <div className="flex items-center justify-between px-5 py-5 sm:px-6">
+        <div>
+          <h3 className="font-semibold text-slate-900">Recent activity</h3>
+          <p className="mt-1 text-xs text-slate-400">Latest activity across the clinic</p>
+        </div>
+      </div>
+
+      {activities.length === 0 ? (
+        <EmptyState text="No recent activity is available." />
+      ) : (
+        <div className="grid gap-2 px-4 pb-4 sm:px-5 sm:pb-5">
+          {activities.map((activity) => {
+            const Icon = icons[activity.type as keyof typeof icons] ?? Activity;
+
+            return (
+              <div key={activity.id} className="flex items-start gap-3 rounded-xl bg-slate-50 px-4 py-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white text-teal-600 shadow-sm">
+                  <Icon className="size-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-slate-800">{activity.title}</p>
+                  <p className="mt-0.5 truncate text-xs text-slate-500">{activity.description}</p>
+                </div>
+                <span className="shrink-0 text-[11px] text-slate-400">{formatRelativeTime(activity.createdAt)}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function OperationalAlerts({ summary }: { summary: DashboardSummary | null }) {
+  const alerts = [
+    summary?.permissions.inventory && (summary.metrics.lowStockBatches ?? 0) > 0
+      ? {
+          label: "Low stock",
+          description: `${summary.metrics.lowStockBatches} medicine batch${summary.metrics.lowStockBatches === 1 ? "" : "es"} at or below reorder level`,
+          href: "/inventory",
+          icon: Package,
+          tone: "amber" as const,
+        }
+      : null,
+    summary?.permissions.laboratory && (summary.metrics.pendingLabOrders ?? 0) > 0
+      ? {
+          label: "Pending laboratory work",
+          description: `${summary.metrics.pendingLabOrders} lab order${summary.metrics.pendingLabOrders === 1 ? "" : "s"} awaiting completion`,
+          href: "/laboratory",
+          icon: FlaskConical,
+          tone: "violet" as const,
+        }
+      : null,
+    summary?.permissions.billing && (summary.metrics.outstandingBillingInvoices ?? 0) > 0
+      ? {
+          label: "Outstanding billing",
+          description: `${summary.metrics.outstandingBillingInvoices} invoice${summary.metrics.outstandingBillingInvoices === 1 ? "" : "s"} · ${formatCurrency(summary.metrics.outstandingBillingAmount)}`,
+          href: "/billing",
+          icon: FileText,
+          tone: "rose" as const,
+        }
+      : null,
+  ].filter(Boolean) as Array<{
+    label: string;
+    description: string;
+    href: string;
+    icon: typeof Package;
+    tone: "amber" | "violet" | "rose";
+  }>;
+
+  const toneClasses = {
+    amber: "bg-amber-50 text-amber-700",
+    violet: "bg-violet-50 text-violet-700",
+    rose: "bg-rose-50 text-rose-700",
+  };
+
+  return (
+    <section className="rounded-2xl bg-white p-5 shadow-[0_8px_30px_rgba(15,23,42,0.045)] ring-1 ring-slate-200/60 sm:p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-semibold text-slate-900">Operational alerts</h3>
+          <p className="mt-1 text-xs text-slate-400">Items that may need attention</p>
+        </div>
+        {alerts.length > 0 && <AlertTriangle className="size-4 text-amber-500" />}
+      </div>
+
+      {alerts.length === 0 ? (
+        <div className="mt-6 rounded-xl bg-emerald-50 px-4 py-5 text-center">
+          <p className="text-sm font-semibold text-emerald-700">All clear</p>
+          <p className="mt-1 text-xs text-emerald-600">No operational alerts require attention right now.</p>
+        </div>
+      ) : (
+        <div className="mt-5 space-y-3">
+          {alerts.map((alert) => {
+            const Icon = alert.icon;
+
+            return (
+              <Link key={alert.label} to={alert.href} className="group flex items-start gap-3 rounded-xl bg-slate-50 p-4 transition-colors hover:bg-slate-100">
+                <div className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${toneClasses[alert.tone]}`}>
+                  <Icon className="size-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-slate-800">{alert.label}</p>
+                  <p className="mt-0.5 text-xs leading-5 text-slate-500">{alert.description}</p>
+                </div>
+                <ArrowRight className="mt-1 size-4 shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-teal-500" />
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function formatRelativeTime(value: string) {
+  const diffMs = Date.now() - new Date(value).getTime();
+  const minutes = Math.max(0, Math.floor(diffMs / 60000));
+
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d`;
+
+  return formatDate(value);
+}
+
 function QuickActions({
   permissions,
 }: {
@@ -1326,6 +1513,13 @@ function QuickActions({
       href: "/laboratory",
       icon: FlaskConical,
       visible: permissions?.laboratory ?? false,
+    },
+    {
+      label: "Open inventory",
+      description: "Manage medicine stock",
+      href: "/inventory",
+      icon: Activity,
+      visible: permissions?.inventory ?? false,
     },
     {
       label: "Open billing",
@@ -1425,7 +1619,7 @@ function EmptyState({ text }: { text: string }) {
 function DashboardSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
         {Array.from({ length: 5 }).map((_, index) => (
           <div
             key={index}

@@ -16,6 +16,7 @@ export const permissions: Record<string, PermissionSeed[]> = {
     { code: 'ROLE_DELETE', name: 'Delete Roles' },
 
     { code: 'PERMISSION_READ', name: 'View Permissions' },
+    { code: 'AUDIT_LOG_READ', name: 'View Audit Logs' },
   ],
 
   CLINIC: [
@@ -44,6 +45,7 @@ export const permissions: Record<string, PermissionSeed[]> = {
     { code: 'APPOINTMENT_CREATE', name: 'Create Appointments' },
     { code: 'APPOINTMENT_UPDATE', name: 'Update Appointments' },
     { code: 'APPOINTMENT_CANCEL', name: 'Cancel Appointments' },
+    { code: 'CONSULTATION_START', name: 'Start Consultations' },
   ],
 
   MEDICAL_RECORD: [

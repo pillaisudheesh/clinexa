@@ -8,22 +8,19 @@ import { UsersModule } from '../users/users.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { type StringValue } from 'ms';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
   imports: [
     UsersModule,
     PassportModule,
+    AuditModule,
 
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const secret = config.getOrThrow<string>('jwt.secret');
-
-        console.log('JWT signing secret:', {
-          length: secret.length,
-          fingerprint: secret.slice(0, 4) + '...' + secret.slice(-4),
-        });
 
         return {
           secret,

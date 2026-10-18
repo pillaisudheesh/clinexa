@@ -1,7 +1,7 @@
-# Clinexa Backend Development Guide
+# SamaRoot Backend Development Guide
 
 **Document Version:** 1.0 (Draft)
-**Product:** Clinexa
+**Product:** SamaRoot
 
 ---
 
@@ -34,7 +34,7 @@
 
 # 1. Purpose
 
-This document defines the backend architecture, coding practices, and development standards for Clinexa.
+This document defines the backend architecture, coding practices, and development standards for SamaRoot.
 
 It serves as the primary implementation guide for developers working on the NestJS backend.
 
@@ -423,7 +423,7 @@ Recommended workflow:
 
 # Backend Development Principles
 
-The Clinexa backend is designed to be:
+The SamaRoot backend is designed to be:
 
 * Modular
 * Secure
@@ -434,4 +434,4 @@ The Clinexa backend is designed to be:
 
 Every module should follow the same architectural patterns to reduce complexity and improve developer productivity.
 
-> **A predictable backend architecture allows developers to focus on business logic rather than framework conventions. Consistency across modules is a key objective of the Clinexa backend.**
+> **A predictable backend architecture allows developers to focus on business logic rather than framework conventions. Consistency across modules is a key objective of the SamaRoot backend.**

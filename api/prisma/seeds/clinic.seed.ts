@@ -9,12 +9,12 @@ export async function seedClinic(prisma: PrismaClient) {
     update: {},
     create: {
       code: 'CLINIC001',
-      name: 'Clinexa Demo Clinic',
+      name: 'SamaRoot Demo Clinic',
 
-      email: 'admin@clinexa.com',
+      email: 'admin@samaroot.com',
       phone: '+1-555-123-4567',
 
-      website: 'https://clinexa.demo',
+      website: 'https://samaroot.demo',
 
       addressLine1: '123 Main Street',
 

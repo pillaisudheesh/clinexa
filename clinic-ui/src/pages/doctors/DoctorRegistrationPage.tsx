@@ -64,6 +64,14 @@ export default function DoctorRegistrationPage() {
     registrationCouncilId: "",
     registrationNumber: "",
     biography: "",
+    consultationFee: "",
+    followUpFee: "",
+    emergencyFee: "",
+    teleConsultationFee: "",
+    scheduleStartTime: "09:00",
+    scheduleEndTime: "17:00",
+    slotDuration: "30",
+    scheduleDays: [1, 2, 3, 4, 5, 6] as number[],
   });
 
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -241,6 +249,16 @@ export default function DoctorRegistrationPage() {
       return;
     }
 
+    if (formData.consultationFee.trim() === "" || !Number.isFinite(Number(formData.consultationFee)) || Number(formData.consultationFee) < 0) {
+      setError("A valid standard consultation fee is required.");
+      return;
+    }
+
+    if (formData.scheduleDays.length > 0 && formData.scheduleEndTime <= formData.scheduleStartTime) {
+      setError("Doctor schedule end time must be after start time.");
+      return;
+    }
+
     try {
       setSaving(true);
 
@@ -277,6 +295,14 @@ export default function DoctorRegistrationPage() {
         employmentType: formData.employmentType,
 
         biography: formData.biography.trim() || undefined,
+        consultationFee: Number(formData.consultationFee),
+        followUpFee: formData.followUpFee.trim() !== "" ? Number(formData.followUpFee) : undefined,
+        emergencyFee: formData.emergencyFee.trim() !== "" ? Number(formData.emergencyFee) : undefined,
+        teleConsultationFee: formData.teleConsultationFee.trim() !== "" ? Number(formData.teleConsultationFee) : undefined,
+        scheduleDays: formData.scheduleDays,
+        scheduleStartTime: formData.scheduleStartTime,
+        scheduleEndTime: formData.scheduleEndTime,
+        slotDuration: Number(formData.slotDuration),
       };
 
       const doctor = await doctorService.createDoctor(payload);
@@ -691,6 +717,61 @@ export default function DoctorRegistrationPage() {
                   </div>
                 </div>
               </section>
+              <section>
+                <div className="mb-5">
+                  <h3 className="text-sm font-semibold text-slate-800">Consultation fees</h3>
+                  <p className="mt-1 text-xs text-slate-400">Set the fees used when creating appointments and checking patients in.</p>
+                </div>
+                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                  {([
+                    ["consultationFee", "Standard fee *", "Required"],
+                    ["followUpFee", "Follow-up fee", "Optional"],
+                    ["emergencyFee", "Emergency fee", "Optional"],
+                    ["teleConsultationFee", "Teleconsultation fee", "Optional"],
+                  ] as const).map(([field, label, placeholder]) => (
+                    <div key={field}>
+                      <label className="mb-1.5 block text-sm font-medium text-slate-700">{label}</label>
+                      <div className="flex items-center rounded-lg bg-white ring-1 ring-slate-200 focus-within:ring-2 focus-within:ring-teal-500">
+                        <span className="pl-3 text-sm text-slate-500">₹</span>
+                        <input type="number" min="0" step="0.01" value={formData[field]} onChange={(event) => handleChange(field, event.target.value)} placeholder={placeholder} className="w-full rounded-lg bg-transparent px-3 py-2.5 text-sm text-slate-700 outline-none" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section>
+                <div className="mb-5">
+                  <h3 className="text-sm font-semibold text-slate-800">Doctor availability</h3>
+                  <p className="mt-1 text-xs text-slate-400">Choose the days and hours when this doctor accepts appointments. These must fit within clinic working hours.</p>
+                </div>
+                <div className="grid gap-5 sm:grid-cols-3">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-slate-700">Start time</label>
+                    <input type="time" value={formData.scheduleStartTime} onChange={(event) => handleChange("scheduleStartTime", event.target.value)} className="w-full rounded-lg bg-white px-3 py-2.5 text-sm text-slate-700 ring-1 ring-slate-200 focus:ring-2 focus:ring-teal-500" />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-slate-700">End time</label>
+                    <input type="time" value={formData.scheduleEndTime} onChange={(event) => handleChange("scheduleEndTime", event.target.value)} className="w-full rounded-lg bg-white px-3 py-2.5 text-sm text-slate-700 ring-1 ring-slate-200 focus:ring-2 focus:ring-teal-500" />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-slate-700">Appointment duration</label>
+                    <select value={formData.slotDuration} onChange={(event) => handleChange("slotDuration", event.target.value)} className="w-full rounded-lg bg-white px-3 py-2.5 text-sm text-slate-700 ring-1 ring-slate-200 focus:ring-2 focus:ring-teal-500">
+                      <option value="10">10 minutes</option><option value="15">15 minutes</option><option value="20">20 minutes</option><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60">60 minutes</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {[{day:1,label:"Monday"},{day:2,label:"Tuesday"},{day:3,label:"Wednesday"},{day:4,label:"Thursday"},{day:5,label:"Friday"},{day:6,label:"Saturday"},{day:0,label:"Sunday"}].map(({day,label}) => (
+                    <label key={day} className={`inline-flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm ring-1 ${formData.scheduleDays.includes(day) ? "bg-teal-50 text-teal-800 ring-teal-200" : "bg-white text-slate-600 ring-slate-200"}`}>
+                      <input type="checkbox" checked={formData.scheduleDays.includes(day)} onChange={(event) => setFormData((current) => ({...current, scheduleDays: event.target.checked ? [...current.scheduleDays, day] : current.scheduleDays.filter((item) => item !== day)}))} className="accent-teal-600" />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-slate-400">Leave all days unchecked if the schedule should be configured later.</p>
+              </section>
+
               <section>
                 <div className="mb-5">
                   <h3 className="text-sm font-semibold text-slate-800">

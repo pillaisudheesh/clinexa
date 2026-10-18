@@ -1,8 +1,8 @@
-# Clinexa Database Design
+# SamaRoot Database Design
 
 **Document Version:** 1.0 (Draft)
 
-**Product:** Clinexa
+**Product:** SamaRoot
 
 **Database:** PostgreSQL
 
@@ -30,7 +30,7 @@
 
 # 1. Purpose
 
-This document defines the logical database architecture for Clinexa.
+This document defines the logical database architecture for SamaRoot.
 
 It serves as the single source of truth for:
 
@@ -46,7 +46,7 @@ It serves as the single source of truth for:
 
 # 2. Database Overview
 
-Clinexa uses **PostgreSQL** as its primary relational database.
+SamaRoot uses **PostgreSQL** as its primary relational database.
 
 The application follows a **Shared Database / Shared Schema** multi-tenant architecture.
 
@@ -103,7 +103,7 @@ Changes must be traceable through audit logging.
 
 # 4. Multi-Tenant Strategy
 
-Clinexa uses a **Shared Database / Shared Schema** architecture.
+SamaRoot uses a **Shared Database / Shared Schema** architecture.
 
 Example:
 
@@ -196,7 +196,7 @@ This provides:
 
 # 7. Audit Strategy
 
-Clinexa maintains a centralized Audit Log.
+SamaRoot maintains a centralized Audit Log.
 
 Audit records should capture:
 
@@ -421,7 +421,7 @@ These modules should integrate through well-defined relationships while preservi
 
 # Database Design Philosophy
 
-Clinexa follows these guiding principles:
+SamaRoot follows these guiding principles:
 
 * Design for scalability from day one.
 * Keep tenant data securely isolated.

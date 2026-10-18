@@ -1,28 +1,28 @@
 import { cn } from "@/lib/utils";
 
-interface ClinexaBrandProps {
+interface SamaRootBrandProps {
   variant?: "default" | "white";
   compact?: boolean;
   className?: string;
 }
 
-export function ClinexaBrand({
+export function SamaRootBrand({
   variant = "default",
   compact = false,
   className,
-}: ClinexaBrandProps) {
+}: SamaRootBrandProps) {
   const src = compact
     ? variant === "white"
-      ? "/brand/clinexa-icon-white.svg"
-      : "/brand/clinexa-icon.svg"
+      ? "/brand/samaroot-icon-white.svg"
+      : "/brand/samaroot-icon.svg"
     : variant === "white"
-      ? "/brand/clinexa-logo-white.svg"
-      : "/brand/clinexa-logo.svg";
+      ? "/brand/samaroot-logo-white.svg"
+      : "/brand/samaroot-logo.svg";
 
   return (
     <img
       src={src}
-      alt="Clinexa"
+      alt="SamaRoot"
       draggable={false}
       className={cn(
         "block object-contain",

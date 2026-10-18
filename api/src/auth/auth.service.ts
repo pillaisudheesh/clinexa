@@ -4,7 +4,13 @@ import * as bcrypt from 'bcrypt';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
+import { AuditService } from '../audit/audit.service';
 import { LoginDto } from './dto/login.dto';
+
+interface AuthAuditContext {
+  ipAddress?: string;
+  userAgent?: string;
+}
 
 @Injectable()
 export class AuthService {
@@ -12,6 +18,7 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
   ) {}
 
   async validateUser(email: string, password: string) {
@@ -40,14 +47,10 @@ export class AuthService {
     const assignments = await this.prisma.userRole.findMany({
       where: {
         userId: user.id,
-        role: {
-          isActive: true,
-        },
+        role: { isActive: true },
       },
       orderBy: {
-        role: {
-          displayOrder: 'asc',
-        },
+        role: { displayOrder: 'asc' },
       },
       select: {
         role: {
@@ -58,9 +61,7 @@ export class AuthService {
             permissions: {
               select: {
                 permission: {
-                  select: {
-                    code: true,
-                  },
+                  select: { code: true },
                 },
               },
             },
@@ -90,14 +91,34 @@ export class AuthService {
       email: user.email,
       clinicId: user.clinicId,
       status: user.status,
+      isPlatformAdmin: user.isPlatformAdmin,
       role: roles[0]?.name ?? null,
       roles,
       permissions,
     };
   }
 
-  async login(dto: LoginDto) {
-    const user = await this.validateUser(dto.email, dto.password);
+  async login(dto: LoginDto, context: AuthAuditContext = {}) {
+    let user: Awaited<ReturnType<UsersService['findByEmail']>>;
+
+    try {
+      user = await this.validateUser(dto.email, dto.password);
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        await this.auditService.create({
+          action: 'LOGIN_FAILURE',
+          entityType: 'AUTH',
+          description: 'Authentication failed',
+          metadata: {
+            email: dto.email,
+          },
+          ipAddress: context.ipAddress,
+          userAgent: context.userAgent,
+        });
+      }
+
+      throw error;
+    }
 
     const payload = {
       sub: user.id,
@@ -105,12 +126,46 @@ export class AuthService {
       clinicId: user.clinicId,
     };
 
+    const accessToken = await this.jwtService.signAsync(payload);
+    const authUser = await this.getAuthUser(user.id);
+
+    await this.auditService.create({
+      clinicId: user.clinicId,
+      actorId: user.id,
+      action: 'LOGIN_SUCCESS',
+      entityType: 'AUTH',
+      entityId: user.id,
+      description: 'User logged in successfully',
+      metadata: {
+        email: user.email,
+      },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+    });
+
     return {
-      accessToken: await this.jwtService.signAsync(payload),
+      accessToken,
       tokenType: 'Bearer',
       expiresIn: '1h',
-      user: await this.getAuthUser(user.id),
+      user: authUser,
     };
+  }
+
+  async logout(userId: string, context: AuthAuditContext = {}) {
+    const user = await this.usersService.findById(userId);
+
+    await this.auditService.create({
+      clinicId: user?.clinicId,
+      actorId: userId,
+      action: 'LOGOUT',
+      entityType: 'AUTH',
+      entityId: userId,
+      description: 'User logged out',
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+    });
+
+    return { message: 'Logged out successfully' };
   }
 
   async me(userId: string) {

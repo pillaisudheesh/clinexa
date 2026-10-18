@@ -16,10 +16,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   ) {
     const secret = configService.getOrThrow<string>('jwt.secret');
 
-    console.log('JWT validation secret:', {
-      length: secret.length,
-      fingerprint: secret.slice(0, 4) + '...' + secret.slice(-4),
-    });
 
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -29,10 +25,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
-    console.log('JWT Payload:', payload);
     const user = await this.usersService.findById(payload.sub);
-    console.log('User:', user);
-    console.log(user?.roles.map((r) => r.role.name));
 
     if (!user) {
       throw new UnauthorizedException('User not found');
@@ -47,7 +40,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       clinicId: user.clinicId,
       email: user.email,
       status: user.status,
+      isPlatformAdmin: user.isPlatformAdmin,
       roles: user.roles.map((roleAssignment) => roleAssignment.role.name),
+      roleCodes: user.roles.map((roleAssignment) => roleAssignment.role.code),
     };
   }
 }

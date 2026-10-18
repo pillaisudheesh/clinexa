@@ -17,7 +17,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { ClinexaBrand } from "@/components/brand/clinexa-brand";
+import { SamaRootBrand } from "@/components/brand/samaroot-brand";
 import { useAuth } from "@/auth/auth-context";
 import { authService } from "@/services/auth-service";
 
@@ -102,7 +102,7 @@ export function LoginPage() {
           </div>
 
           <div className="relative z-10">
-            <ClinexaBrand variant="white" className="h-16 w-auto" />
+            <SamaRootBrand variant="white" className="h-16 w-auto" />
           </div>
 
           <div className="relative z-10 flex flex-1 items-center py-12 xl:py-16">
@@ -121,7 +121,7 @@ export function LoginPage() {
               </h1>
 
               <p className="mt-7 max-w-2xl text-base leading-7 text-cyan-50/85 xl:text-lg">
-                Clinexa brings your clinic&apos;s patients, appointments,
+                SamaRoot brings your clinic&apos;s patients, appointments,
                 consultations, laboratory, pharmacy and billing workflows
                 together in one secure workspace.
               </p>
@@ -164,7 +164,7 @@ export function LoginPage() {
           </div>
 
           <div className="relative z-10 flex items-center justify-between text-xs text-cyan-50/65">
-            <span>© {new Date().getFullYear()} Clinexa</span>
+            <span>© {new Date().getFullYear()} SamaRoot</span>
             <span>Smarter Care. Better Outcomes.</span>
           </div>
         </section>
@@ -190,14 +190,14 @@ export function LoginPage() {
           <div className="relative z-10 w-full max-w-[490px]">
             {/* Mobile branding */}
             <div className="mb-8 flex justify-center lg:hidden">
-              <ClinexaBrand className="h-16 w-auto" />
+              <SamaRootBrand className="h-16 w-auto" />
             </div>
 
             <Card className="overflow-hidden rounded-[26px] border-0 bg-white/95 shadow-[0_30px_90px_-28px_rgba(15,118,110,0.30)] ring-1 ring-slate-200/70 backdrop-blur-xl">
               <CardContent className="p-7 sm:p-9 lg:p-10">
                 <div className="mb-8">
                   <div className="mb-7 hidden lg:block">
-                    <ClinexaBrand className="h-14 w-auto" />
+                    <SamaRootBrand className="h-14 w-auto" />
                   </div>
 
                   <h2 className="text-3xl font-semibold tracking-[-0.03em] text-slate-950">
@@ -205,7 +205,7 @@ export function LoginPage() {
                   </h2>
 
                   <p className="mt-2 text-sm leading-6 text-slate-500">
-                    Sign in to access your Clinexa account.
+                    Sign in to access your SamaRoot account.
                   </p>
                 </div>
 
@@ -335,7 +335,7 @@ export function LoginPage() {
             </Card>
 
             <p className="mt-5 text-center text-xs text-slate-400 lg:hidden">
-              © {new Date().getFullYear()} Clinexa · Smarter Care. Better
+              © {new Date().getFullYear()} SamaRoot · Smarter Care. Better
               Outcomes.
             </p>
           </div>

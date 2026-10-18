@@ -9,6 +9,7 @@ import {
   IsEnum,
   IsInt,
   IsOptional,
+  IsNumber,
   IsPhoneNumber,
   IsString,
   IsUUID,
@@ -68,6 +69,54 @@ export class CreateDoctorDto {
   @IsArray()
   @IsUUID('4', { each: true })
   additionalSpecialtyIds?: string[];
+
+  @ApiProperty({ description: 'Standard consultation fee', example: 500 })
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  consultationFee!: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  followUpFee?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  emergencyFee?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  teleConsultationFee?: number;
+
+  @ApiPropertyOptional({ type: [Number], description: 'Weekdays: Sunday=0 through Saturday=6' })
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  @Min(0, { each: true })
+  @Max(6, { each: true })
+  scheduleDays?: number[];
+
+  @ApiPropertyOptional({ example: '09:00' })
+  @IsOptional()
+  @IsString()
+  scheduleStartTime?: string;
+
+  @ApiPropertyOptional({ example: '17:00' })
+  @IsOptional()
+  @IsString()
+  scheduleEndTime?: string;
+
+  @ApiPropertyOptional({ example: 30 })
+  @IsOptional()
+  @IsInt()
+  @Min(5)
+  @Max(240)
+  slotDuration?: number;
 
   @ApiPropertyOptional({
     type: [String],
