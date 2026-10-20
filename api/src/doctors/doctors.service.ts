@@ -211,22 +211,24 @@ export class DoctorsService {
           });
         }
 
-        return tx.doctor.findUniqueOrThrow({
+        const doctor = await tx.doctor.findUniqueOrThrow({
           where: {
             id: createdDoctor.id,
           },
           include: doctorInclude,
         });
-      });
 
-      await this.auditService.create({
-        clinicId,
-        actorId,
-        action: 'CREATE',
-        entityType: 'Doctor',
-        entityId: doctor.id,
-        description: 'Doctor created',
-        metadata: { doctorNumber: doctor.doctorNumber },
+        await this.auditService.createInTransaction(tx, {
+          clinicId,
+          actorId,
+          action: 'CREATE',
+          entityType: 'Doctor',
+          entityId: doctor.id,
+          description: 'Doctor created',
+          metadata: { doctorNumber: doctor.doctorNumber },
+        });
+
+        return doctor;
       });
 
       return DoctorMapper.toResponse(doctor);
@@ -408,6 +410,7 @@ export class DoctorsService {
         await tx.doctor.update({
           where: {
             id,
+            clinicId,
           },
 
           data: {
@@ -597,23 +600,25 @@ export class DoctorsService {
           }
         }
 
-        return tx.doctor.findUniqueOrThrow({
+        const updatedDoctor = await tx.doctor.findUniqueOrThrow({
           where: {
             id,
           },
 
           include: doctorInclude,
         });
-      });
 
-      await this.auditService.create({
-        clinicId,
-        actorId,
-        action: 'UPDATE',
-        entityType: 'Doctor',
-        entityId: doctor.id,
-        description: 'Doctor updated',
-        metadata: { doctorNumber: doctor.doctorNumber },
+        await this.auditService.createInTransaction(tx, {
+          clinicId,
+          actorId,
+          action: 'UPDATE',
+          entityType: 'Doctor',
+          entityId: updatedDoctor.id,
+          description: 'Doctor updated',
+          metadata: { doctorNumber: updatedDoctor.doctorNumber },
+        });
+
+        return updatedDoctor;
       });
 
       return DoctorMapper.toResponse(doctor);
@@ -648,23 +653,27 @@ export class DoctorsService {
 
     const statusChanged = existingDoctor.isActive !== dto.isActive;
 
-    const doctor = await this.prisma.doctor.update({
-      where: { id },
-      data: { isActive: dto.isActive },
-      include: doctorInclude,
-    });
-
-    if (statusChanged) {
-      await this.auditService.create({
-        clinicId,
-        actorId,
-        action: dto.isActive ? 'ACTIVATE' : 'DEACTIVATE',
-        entityType: 'Doctor',
-        entityId: doctor.id,
-        description: dto.isActive ? 'Doctor activated' : 'Doctor deactivated',
-        metadata: { doctorNumber: doctor.doctorNumber },
+    const doctor = await this.prisma.$transaction(async (tx) => {
+      const updatedDoctor = await tx.doctor.update({
+        where: { id, clinicId },
+        data: { isActive: dto.isActive },
+        include: doctorInclude,
       });
-    }
+
+      if (statusChanged) {
+        await this.auditService.createInTransaction(tx, {
+          clinicId,
+          actorId,
+          action: dto.isActive ? 'ACTIVATE' : 'DEACTIVATE',
+          entityType: 'Doctor',
+          entityId: updatedDoctor.id,
+          description: dto.isActive ? 'Doctor activated' : 'Doctor deactivated',
+          metadata: { doctorNumber: updatedDoctor.doctorNumber },
+        });
+      }
+
+      return updatedDoctor;
+    });
 
     return DoctorMapper.toResponse(doctor);
   }
@@ -686,19 +695,21 @@ export class DoctorsService {
     }
 
     if (existingDoctor.isActive) {
-      await this.prisma.doctor.update({
-        where: { id },
-        data: { isActive: false },
-      });
+      await this.prisma.$transaction(async (tx) => {
+        await tx.doctor.update({
+          where: { id, clinicId },
+          data: { isActive: false },
+        });
 
-      await this.auditService.create({
-        clinicId,
-        actorId,
-        action: 'DEACTIVATE',
-        entityType: 'Doctor',
-        entityId: existingDoctor.id,
-        description: 'Doctor deactivated',
-        metadata: { doctorNumber: existingDoctor.doctorNumber },
+        await this.auditService.createInTransaction(tx, {
+          clinicId,
+          actorId,
+          action: 'DEACTIVATE',
+          entityType: 'Doctor',
+          entityId: existingDoctor.id,
+          description: 'Doctor deactivated',
+          metadata: { doctorNumber: existingDoctor.doctorNumber },
+        });
       });
     }
 

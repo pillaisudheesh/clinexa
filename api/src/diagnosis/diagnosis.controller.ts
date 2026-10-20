@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Delete,
   Get,
   Param,
@@ -19,6 +20,8 @@ import {
 } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { PermissionCodes } from '../auth/constants/permission-codes';
@@ -71,8 +74,11 @@ export class DiagnosisController {
     status: 404,
     description: 'Medical record not found.',
   })
-  create(@Body() dto: CreateDiagnosisDto): Promise<DiagnosisResponseDto> {
-    return this.diagnosesService.create(dto);
+  create(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateDiagnosisDto,
+  ): Promise<DiagnosisResponseDto> {
+    return this.diagnosesService.create(this.clinicId(user), dto);
   }
 
   // ===========================================================================
@@ -99,9 +105,10 @@ export class DiagnosisController {
     description: 'Insufficient permissions.',
   })
   findAll(
+    @CurrentUser() user: AuthenticatedUser,
     @Query() query: DiagnosisQueryDto,
   ): Promise<PaginatedResponseDto<DiagnosisResponseDto>> {
-    return this.diagnosesService.findAll(query);
+    return this.diagnosesService.findAll(this.clinicId(user), query);
   }
 
   // ===========================================================================
@@ -131,9 +138,10 @@ export class DiagnosisController {
     description: 'Diagnosis not found.',
   })
   findOne(
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe()) id: string,
   ): Promise<DiagnosisResponseDto> {
-    return this.diagnosesService.findOne(id);
+    return this.diagnosesService.findOne(this.clinicId(user), id);
   }
 
   // ===========================================================================
@@ -169,10 +177,11 @@ export class DiagnosisController {
     description: 'Diagnosis not found.',
   })
   update(
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() dto: UpdateDiagnosisDto,
   ): Promise<DiagnosisResponseDto> {
-    return this.diagnosesService.update(id, dto);
+    return this.diagnosesService.update(this.clinicId(user), id, dto);
   }
 
   // ===========================================================================
@@ -201,8 +210,16 @@ export class DiagnosisController {
     description: 'Diagnosis not found.',
   })
   remove(
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe()) id: string,
   ): Promise<{ message: string }> {
-    return this.diagnosesService.remove(id);
+    return this.diagnosesService.remove(this.clinicId(user), id);
+  }
+
+  private clinicId(user: AuthenticatedUser): string {
+    if (!user.clinicId) {
+      throw new ForbiddenException('Authenticated user has no clinic context');
+    }
+    return user.clinicId;
   }
 }

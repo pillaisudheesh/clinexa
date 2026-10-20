@@ -311,6 +311,18 @@ export class InventoryService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      // Lock this batch row before reading quantity so concurrent adjustments
+      // serialize and the audit/ledger quantities reflect the committed order.
+      const lockedRows = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id"
+        FROM "MedicineBatch"
+        WHERE "id" = ${id} AND "clinicId" = ${clinicId}
+        FOR UPDATE
+      `;
+      if (lockedRows.length === 0) {
+        throw new NotFoundException('Medicine batch not found');
+      }
+
       const batch = await tx.medicineBatch.findFirst({
         where: {
           id,
@@ -352,6 +364,7 @@ export class InventoryService {
       const result = await tx.medicineBatch.update({
         where: {
           id: batch.id,
+          clinicId,
         },
 
         data: {
@@ -695,6 +708,7 @@ export class InventoryService {
       const updated = await tx.medicineBatch.update({
         where: {
           id: batch.id,
+          clinicId,
         },
 
         data: {
@@ -1032,7 +1046,7 @@ export class InventoryService {
 
               if (existingBatch) {
                 batch = await tx.medicineBatch.update({
-                  where: { id: existingBatch.id },
+                  where: { id: existingBatch.id, clinicId },
                   data: {
                     quantity: existingBatch.quantity + item.quantity,
                     purchasePrice,

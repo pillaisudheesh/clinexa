@@ -184,7 +184,7 @@ export class RolesService {
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const result = await tx.role.update({
-        where: { id },
+        where: { id, clinicId },
         data: {
           name: dto.name,
           description: dto.description,
@@ -245,7 +245,7 @@ export class RolesService {
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const result = await tx.role.update({
-        where: { id },
+        where: { id, clinicId },
         data: { isActive },
       });
 
@@ -281,16 +281,6 @@ export class RolesService {
     // _isPlatformAdmin = false,
   ): Promise<RoleResponseDto> {
     const role = await this.getRoleOrThrow(clinicId, roleId);
-
-    console.log('[assignPermissions]', {
-      clinicId,
-      roleId,
-      actorId,
-      permissionCount: permissionIds?.length,
-      hasBillingUpdate: permissionIds?.includes(
-        'f3822396-3df9-42af-a3e5-a39d1bb73711',
-      ),
-    });
 
     if (!role.isActive) {
       throw new ConflictException(

@@ -166,6 +166,7 @@ export class DepartmentsService {
     const department = await this.prisma.department.update({
       where: {
         id,
+        clinicId,
       },
 
       data: {
@@ -200,6 +201,7 @@ export class DepartmentsService {
     const department = await this.prisma.department.update({
       where: {
         id,
+        clinicId,
       },
 
       data: {

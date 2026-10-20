@@ -8,22 +8,29 @@ import {
 
 import { PrismaService } from '../prisma/prisma.service';
 import { PermissionCodes } from '../auth/constants/permission-codes';
+import {
+  addCalendarDays,
+  dateOnlyUtcRange,
+  startOfDateInTimezone,
+  dateKeyInTimezone,
+} from '../common/utils/timezone.util';
 
 @Injectable()
 export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getSummary(clinicId: string, userId: string) {
-    const permissions = await this.getUserPermissions(clinicId, userId);
+    const [permissions, clinic] = await Promise.all([
+      this.getUserPermissions(clinicId, userId),
+      this.prisma.clinic.findUnique({ where: { id: clinicId }, select: { timezone: true } }),
+    ]);
+    const timezone = clinic?.timezone || 'UTC';
+    const todayKey = dateKeyInTimezone(new Date(), timezone);
+    const startOfToday = startOfDateInTimezone(todayKey, timezone);
+    const startOfTomorrow = startOfDateInTimezone(addCalendarDays(todayKey, 1), timezone);
+    const appointmentDateRange = dateOnlyUtcRange(todayKey);
 
     const can = (permission: string) => permissions.has(permission);
-
-    const today = new Date();
-    const startOfToday = new Date(today);
-    startOfToday.setHours(0, 0, 0, 0);
-
-    const startOfTomorrow = new Date(startOfToday);
-    startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
 
     const [
       patientCount,
@@ -59,8 +66,8 @@ export class DashboardService {
             where: {
               clinicId,
               appointmentDate: {
-                gte: startOfToday,
-                lt: startOfTomorrow,
+                gte: appointmentDateRange.from,
+                lt: appointmentDateRange.to,
               },
               status: {
                 not: AppointmentStatus.CANCELLED,
@@ -317,8 +324,8 @@ export class DashboardService {
           where: {
             clinicId,
             appointmentDate: {
-              gte: startOfToday,
-              lt: startOfTomorrow,
+              gte: appointmentDateRange.from,
+              lt: appointmentDateRange.to,
             },
           },
           _count: {

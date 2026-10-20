@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -472,6 +473,7 @@ export class LabOrdersService {
     const updatedOrder = await this.prisma.labOrder.update({
       where: {
         id,
+        clinicId,
       },
 
       data: {
@@ -580,15 +582,18 @@ export class LabOrdersService {
       // Mark item completed
       // ---------------------------------------------------------------------
 
-      await tx.labOrderItem.update({
+      const itemUpdate = await tx.labOrderItem.updateMany({
         where: {
           id: item.id,
+          labOrder: { clinicId },
         },
-
         data: {
           status: LabOrderItemStatus.COMPLETED,
         },
       });
+      if (itemUpdate.count !== 1) {
+        throw new NotFoundException('Laboratory order item not found');
+      }
 
       // ---------------------------------------------------------------------
       // Determine whether the complete order is finished
@@ -607,6 +612,7 @@ export class LabOrdersService {
       await tx.labOrder.update({
         where: {
           id: item.labOrderId,
+          clinicId,
         },
 
         data: {
@@ -677,15 +683,16 @@ export class LabOrdersService {
     // -------------------------------------------------------------------------
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.labOrderItem.update({
+      const itemUpdate = await tx.labOrderItem.updateMany({
         where: {
           id: itemId,
+          labOrder: { clinicId },
         },
-
-        data: {
-          status,
-        },
+        data: { status },
       });
+      if (itemUpdate.count !== 1) {
+        throw new NotFoundException('Laboratory order item not found');
+      }
 
       // ---------------------------------------------------------------------
       // If processing starts, move the order to IN_PROGRESS
@@ -695,6 +702,7 @@ export class LabOrdersService {
         await tx.labOrder.update({
           where: {
             id: item.labOrderId,
+            clinicId,
           },
 
           data: {
@@ -860,27 +868,39 @@ export class LabOrdersService {
     tx: Prisma.TransactionClient,
     clinicId: string,
   ): Promise<string> {
-    const clinic = await tx.clinic.findUnique({
-      where: { id: clinicId },
-      select: { code: true },
-    });
-
-    if (!clinic) {
-      throw new NotFoundException('Clinic not found');
-    }
-
+    // Count-based numbering races under concurrent lab orders. Use the same
+    // persisted per-clinic sequence as Billing and Appointments, while also
+    // skipping legacy invoice numbers already present in the database.
     const year = new Date().getFullYear();
 
-    const count = await tx.invoice.count({
-      where: {
-        clinicId,
-        createdAt: {
-          gte: new Date(`${year}-01-01T00:00:00.000Z`),
-          lt: new Date(`${year + 1}-01-01T00:00:00.000Z`),
-        },
-      },
-    });
+    for (let attempt = 0; attempt < 1000; attempt += 1) {
+      const clinic = await tx.clinic
+        .update({
+          where: { id: clinicId },
+          data: { invoiceSequence: { increment: 1 } },
+          select: { code: true, invoiceSequence: true },
+        })
+        .catch((error: unknown) => {
+          if (
+            error instanceof Prisma.PrismaClientKnownRequestError &&
+            error.code === 'P2025'
+          ) {
+            throw new NotFoundException('Clinic not found');
+          }
+          throw error;
+        });
 
-    return `INV-${clinic.code}-${year}-${String(count + 1).padStart(6, '0')}`;
+      const candidate = `INV-${clinic.code}-${year}-${String(clinic.invoiceSequence).padStart(6, '0')}`;
+      const existing = await tx.invoice.findFirst({
+        where: { clinicId, invoiceNumber: candidate },
+        select: { id: true },
+      });
+
+      if (!existing) return candidate;
+    }
+
+    throw new ConflictException(
+      'Unable to allocate a unique invoice number. Please retry the operation.',
+    );
   }
 }

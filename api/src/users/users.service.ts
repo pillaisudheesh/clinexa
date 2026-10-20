@@ -34,13 +34,13 @@ export class UsersService {
     private readonly auditService: AuditService,
   ) {}
 
-  private isSuperAdministrator(user: AuthenticatedUser): boolean {
-    const values = [...(user.roles ?? []), ...(user.roleCodes ?? [])];
-    return values.some((value) =>
-      ['SUPER_ADMIN', 'SUPER ADMIN', 'SUPER_ADMINISTRATOR'].includes(
-        value.trim().toUpperCase().replace(/[_-]+/g, ' '),
-      ),
-    );
+  /**
+   * Platform-wide user management is controlled only by the persisted
+   * isPlatformAdmin flag hydrated by JwtStrategy. A clinic role's display
+   * name or code must never grant cross-clinic authority.
+   */
+  private isPlatformAdministrator(user: AuthenticatedUser): boolean {
+    return user.isPlatformAdmin === true;
   }
 
   private isSuperAdminRoleCode(code: string): boolean {
@@ -48,7 +48,7 @@ export class UsersService {
       code
         .trim()
         .toUpperCase()
-        .replace(/[\\s-]+/g, '_'),
+        .replace(/[\s-]+/g, '_'),
     );
   }
 
@@ -56,8 +56,8 @@ export class UsersService {
     dto: CreateUserDto,
     requester: AuthenticatedUser,
   ): Promise<UserResponseDto> {
-    const isSuperAdmin = this.isSuperAdministrator(requester);
-    if (!isSuperAdmin && dto.clinicId !== requester.clinicId) {
+    const isPlatformAdmin = this.isPlatformAdministrator(requester);
+    if (!isPlatformAdmin && dto.clinicId !== requester.clinicId) {
       throw new ForbiddenException(
         'You can only create users for your own clinic.',
       );
@@ -83,7 +83,7 @@ export class UsersService {
       );
     }
     if (
-      !isSuperAdmin &&
+      !isPlatformAdmin &&
       roles.some((role) => this.isSuperAdminRoleCode(role.code))
     ) {
       throw new ForbiddenException(
@@ -150,7 +150,7 @@ export class UsersService {
     const skip = (page - 1) * limit;
 
     const where: Prisma.UserWhereInput = {
-      ...(!this.isSuperAdministrator(requester)
+      ...(!this.isPlatformAdministrator(requester)
         ? { clinicId: requester.clinicId }
         : {}),
       ...(search
@@ -204,14 +204,14 @@ export class UsersService {
 
     if (
       !existingUser ||
-      (!this.isSuperAdministrator(requester) &&
+      (!this.isPlatformAdministrator(requester) &&
         existingUser.clinicId !== requester.clinicId)
     ) {
       throw new NotFoundException('User not found.');
     }
 
     if (
-      !this.isSuperAdministrator(requester) &&
+      !this.isPlatformAdministrator(requester) &&
       dto.clinicId &&
       dto.clinicId !== requester.clinicId
     ) {
@@ -258,7 +258,7 @@ export class UsersService {
         );
       }
       if (
-        !this.isSuperAdministrator(requester) &&
+        !this.isPlatformAdministrator(requester) &&
         roles.some((role) => this.isSuperAdminRoleCode(role.code))
       ) {
         throw new ForbiddenException(
@@ -279,8 +279,13 @@ export class UsersService {
     }
 
     const updatedUser = await this.prisma.$transaction(async (tx) => {
-      await tx.user.update({
-        where: { id },
+      // Recheck tenant ownership at mutation time. A platform administrator
+      // may have moved this user after the initial read; clinic admins must
+      // not be able to modify the user after that move.
+      const mutation = await tx.user.updateMany({
+        where: this.isPlatformAdministrator(requester)
+          ? { id }
+          : { id, clinicId: requester.clinicId },
         data: {
           firstName: dto.firstName,
           lastName: dto.lastName,
@@ -288,6 +293,9 @@ export class UsersService {
           clinicId: dto.clinicId,
         },
       });
+      if (mutation.count !== 1) {
+        throw new NotFoundException('User not found.');
+      }
 
       if (dto.roleIds !== undefined) {
         await tx.userRole.deleteMany({ where: { userId: id } });
@@ -361,7 +369,7 @@ export class UsersService {
 
     if (
       !existingUser ||
-      (!this.isSuperAdministrator(requester) &&
+      (!this.isPlatformAdministrator(requester) &&
         existingUser.clinicId !== requester.clinicId)
     ) {
       throw new NotFoundException('User not found.');
@@ -372,9 +380,17 @@ export class UsersService {
     }
 
     const updatedUser = await this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.update({
-        where: { id },
+      const mutation = await tx.user.updateMany({
+        where: this.isPlatformAdministrator(requester)
+          ? { id }
+          : { id, clinicId: requester.clinicId },
         data: { status: dto.status },
+      });
+      if (mutation.count !== 1) {
+        throw new NotFoundException('User not found.');
+      }
+      const user = await tx.user.findUniqueOrThrow({
+        where: { id },
         include: { roles: { include: { role: true } } },
       });
 

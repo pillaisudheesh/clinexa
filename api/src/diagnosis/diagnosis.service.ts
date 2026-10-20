@@ -16,10 +16,13 @@ export class DiagnosisService {
   // CREATE
   // ===========================================================================
 
-  async create(dto: CreateDiagnosisDto) {
-    const medicalRecord = await this.prisma.medicalRecord.findUnique({
+  async create(clinicId: string, dto: CreateDiagnosisDto) {
+    const medicalRecord = await this.prisma.medicalRecord.findFirst({
       where: {
         id: dto.medicalRecordId,
+        patient: { clinicId },
+        doctor: { clinicId },
+        appointment: { clinicId },
       },
     });
 
@@ -57,6 +60,7 @@ export class DiagnosisService {
   // ===========================================================================
 
   async findAll(
+    clinicId: string,
     query: DiagnosisQueryDto,
   ): Promise<PaginatedResponseDto<DiagnosisResponseDto>> {
     const { page = 1, limit = 10, search, medicalRecordId } = query;
@@ -64,6 +68,11 @@ export class DiagnosisService {
     const skip = (page - 1) * limit;
 
     const where = {
+      medicalRecord: {
+        patient: { clinicId },
+        doctor: { clinicId },
+        appointment: { clinicId },
+      },
       ...(medicalRecordId && {
         medicalRecordId,
       }),
@@ -120,10 +129,15 @@ export class DiagnosisService {
   // GET BY ID
   // ===========================================================================
 
-  async findOne(id: string) {
-    const diagnosis = await this.prisma.diagnosis.findUnique({
+  async findOne(clinicId: string, id: string) {
+    const diagnosis = await this.prisma.diagnosis.findFirst({
       where: {
         id,
+        medicalRecord: {
+          patient: { clinicId },
+          doctor: { clinicId },
+          appointment: { clinicId },
+        },
       },
       include: {
         medicalRecord: {
@@ -148,10 +162,15 @@ export class DiagnosisService {
   // UPDATE
   // ===========================================================================
 
-  async update(id: string, dto: UpdateDiagnosisDto) {
-    const existing = await this.prisma.diagnosis.findUnique({
+  async update(clinicId: string, id: string, dto: UpdateDiagnosisDto) {
+    const existing = await this.prisma.diagnosis.findFirst({
       where: {
         id,
+        medicalRecord: {
+          patient: { clinicId },
+          doctor: { clinicId },
+          appointment: { clinicId },
+        },
       },
     });
 
@@ -160,10 +179,24 @@ export class DiagnosisService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      // Recheck tenant ownership inside the transaction before changing records.
+      const scoped = await tx.diagnosis.findFirst({
+        where: {
+          id,
+          medicalRecord: {
+            patient: { clinicId },
+            doctor: { clinicId },
+            appointment: { clinicId },
+          },
+        },
+        select: { id: true, medicalRecordId: true },
+      });
+      if (!scoped) throw new NotFoundException('Diagnosis not found');
+
       if (dto.isPrimary === true) {
         await tx.diagnosis.updateMany({
           where: {
-            medicalRecordId: existing.medicalRecordId,
+            medicalRecordId: scoped.medicalRecordId,
             isPrimary: true,
             NOT: {
               id,
@@ -177,7 +210,7 @@ export class DiagnosisService {
 
       return tx.diagnosis.update({
         where: {
-          id,
+          id: scoped.id,
         },
         data: {
           ...(dto.code !== undefined && {
@@ -204,10 +237,15 @@ export class DiagnosisService {
   // DELETE
   // ===========================================================================
 
-  async remove(id: string) {
-    const existing = await this.prisma.diagnosis.findUnique({
+  async remove(clinicId: string, id: string) {
+    const existing = await this.prisma.diagnosis.findFirst({
       where: {
         id,
+        medicalRecord: {
+          patient: { clinicId },
+          doctor: { clinicId },
+          appointment: { clinicId },
+        },
       },
     });
 
@@ -215,10 +253,20 @@ export class DiagnosisService {
       throw new NotFoundException('Diagnosis not found');
     }
 
-    await this.prisma.diagnosis.delete({
-      where: {
-        id,
-      },
+    await this.prisma.$transaction(async (tx) => {
+      const scoped = await tx.diagnosis.findFirst({
+        where: {
+          id,
+          medicalRecord: {
+            patient: { clinicId },
+            doctor: { clinicId },
+            appointment: { clinicId },
+          },
+        },
+        select: { id: true },
+      });
+      if (!scoped) throw new NotFoundException('Diagnosis not found');
+      await tx.diagnosis.delete({ where: { id: scoped.id } });
     });
 
     return {

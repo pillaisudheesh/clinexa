@@ -127,67 +127,83 @@ export class AppointmentsService {
       );
     }
 
-    const conflictingAppointment = await this.findConflictingAppointment(
-      doctor.id,
-      appointmentDate,
-      dto.startTime,
-      dto.endTime,
-    );
-
-    if (conflictingAppointment) {
-      throw new ConflictException(
-        'Doctor is already booked for the selected time',
-      );
-    }
-
-    const appointmentNumber = await this.generateAppointmentNumber(clinicId);
-
     const consultationFee = this.getConsultationFee(
       doctor.consultationFee,
       dto.type,
     );
 
-    const appointment = await this.prisma.appointment.create({
-      data: {
+    // Serialize bookings for the same clinic/doctor/day. A plain pre-check is
+    // racy: two concurrent requests can both see an empty slot and insert.
+    const appointment = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT 1::int AS locked FROM (
+        SELECT pg_advisory_xact_lock(
+          hashtext(${clinicId}),
+          hashtext(${doctor.id + ':' + appointmentDate.toISOString().slice(0, 10)})
+        )
+      ) AS appointment_lock`;
+
+      // Appointment numbers are unique per clinic/year, not per doctor/day.
+      // Use a second clinic-wide lock before generating the next number.
+      const year = new Date().getFullYear();
+      await tx.$queryRaw`SELECT 1::int AS locked FROM (
+        SELECT pg_advisory_xact_lock(
+          hashtext(${clinicId}),
+          hashtext(${'appointment-number:' + year})
+        )
+      ) AS appointment_number_lock`;
+      const appointmentNumber = await this.generateAppointmentNumber(
         clinicId,
-        appointmentNumber,
+        tx,
+      );
 
-        patientId: patient.id,
-        doctorId: doctor.id,
-
+      const conflict = await this.findConflictingAppointmentWithClient(
+        tx,
+        clinicId,
+        doctor.id,
         appointmentDate,
+        dto.startTime,
+        dto.endTime,
+      );
+      if (conflict) {
+        throw new ConflictException(
+          'Doctor is already booked for the selected time',
+        );
+      }
 
-        startTime: dto.startTime,
-        endTime: dto.endTime,
+      const created = await tx.appointment.create({
+        data: {
+          clinicId,
+          appointmentNumber,
+          patientId: patient.id,
+          doctorId: doctor.id,
+          appointmentDate,
+          startTime: dto.startTime,
+          endTime: dto.endTime,
+          type: dto.type ?? AppointmentType.NEW_CONSULTATION,
+          status: AppointmentStatus.SCHEDULED,
+          priority: dto.priority ?? AppointmentPriority.ROUTINE,
+          reason: dto.reason,
+          notes: dto.notes,
+          consultationFee,
+        },
+        include: this.appointmentInclude(),
+      });
 
-        type: dto.type ?? AppointmentType.NEW_CONSULTATION,
-
-        status: AppointmentStatus.SCHEDULED,
-
-        priority: dto.priority ?? AppointmentPriority.ROUTINE,
-
-        reason: dto.reason,
-        notes: dto.notes,
-
-        consultationFee,
-      },
-
-      include: this.appointmentInclude(),
-    });
-
-    await this.auditService.create({
-      clinicId,
-      actorId,
-      action: 'CREATE',
-      entityType: 'Appointment',
-      entityId: appointment.id,
-      description: 'Appointment created',
-      metadata: {
-        appointmentNumber: appointment.appointmentNumber,
-        patientId: appointment.patientId,
-        doctorId: appointment.doctorId,
-        status: appointment.status,
-      },
+      await this.auditService.createInTransaction(tx, {
+        clinicId,
+        actorId,
+        action: 'CREATE',
+        entityType: 'Appointment',
+        entityId: created.id,
+        description: 'Appointment created',
+        metadata: {
+          appointmentNumber: created.appointmentNumber,
+          patientId: created.patientId,
+          doctorId: created.doctorId,
+          status: created.status,
+        },
+      });
+      return created;
     });
 
     return this.toResponse(appointment);
@@ -406,6 +422,10 @@ export class AppointmentsService {
 
     this.validateStatusForUpdate(existing.status);
 
+    if (dto.status !== undefined && dto.status !== existing.status) {
+      this.validateStatusTransition(existing.status, dto.status);
+    }
+
     const appointmentDate = dto.appointmentDate
       ? this.parseDate(dto.appointmentDate)
       : existing.appointmentDate;
@@ -477,6 +497,7 @@ export class AppointmentsService {
       }
 
       const conflict = await this.findConflictingAppointment(
+        clinicId,
         existing.doctorId,
         appointmentDate,
         startTime,
@@ -500,54 +521,61 @@ export class AppointmentsService {
       cancellationReason = dto.notes ?? existing.cancellationReason;
     }
 
-    const updated = await this.prisma.appointment.update({
-      where: {
-        id: existing.id,
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // Use the same lock key as create() so concurrent reschedules cannot
+      // bypass the availability check. The current appointment is excluded.
+      await tx.$queryRaw`SELECT 1::int AS locked FROM (
+        SELECT pg_advisory_xact_lock(
+          hashtext(${clinicId}),
+          hashtext(${existing.doctorId + ':' + appointmentDate.toISOString().slice(0, 10)})
+        )
+      ) AS appointment_lock`;
 
-      data: {
+      const conflict = await this.findConflictingAppointmentWithClient(
+        tx,
+        clinicId,
+        existing.doctorId,
         appointmentDate,
         startTime,
         endTime,
+        existing.id,
+      );
+      if (conflict) {
+        throw new ConflictException(
+          'Doctor is already booked for the selected time',
+        );
+      }
 
-        ...(dto.type !== undefined && {
-          type: dto.type,
-        }),
+      const changed = await tx.appointment.update({
+        where: { id: existing.id },
+        data: {
+          appointmentDate,
+          startTime,
+          endTime,
+          ...(dto.type !== undefined && { type: dto.type }),
+          ...(dto.priority !== undefined && { priority: dto.priority }),
+          ...(dto.status !== undefined && { status: dto.status }),
+          ...(dto.reason !== undefined && { reason: dto.reason }),
+          ...(dto.notes !== undefined && { notes: dto.notes }),
+          cancellationReason,
+        },
+        include: this.appointmentInclude(),
+      });
 
-        ...(dto.priority !== undefined && {
-          priority: dto.priority,
-        }),
-
-        ...(dto.status !== undefined && {
-          status: dto.status,
-        }),
-
-        ...(dto.reason !== undefined && {
-          reason: dto.reason,
-        }),
-
-        ...(dto.notes !== undefined && {
-          notes: dto.notes,
-        }),
-
-        cancellationReason,
-      },
-
-      include: this.appointmentInclude(),
-    });
-
-    await this.auditService.create({
-      clinicId,
-      actorId,
-      action: 'UPDATE',
-      entityType: 'Appointment',
-      entityId: updated.id,
-      description: 'Appointment updated',
-      metadata: {
-        appointmentNumber: updated.appointmentNumber,
-        previousStatus: existing.status,
-        newStatus: updated.status,
-      },
+      await this.auditService.createInTransaction(tx, {
+        clinicId,
+        actorId,
+        action: 'UPDATE',
+        entityType: 'Appointment',
+        entityId: changed.id,
+        description: 'Appointment updated',
+        metadata: {
+          appointmentNumber: changed.appointmentNumber,
+          previousStatus: existing.status,
+          newStatus: changed.status,
+        },
+      });
+      return changed;
     });
 
     return this.toResponse(updated);
@@ -562,52 +590,49 @@ export class AppointmentsService {
     reason: string | undefined,
     actorId: string,
   ) {
-    const appointment = await this.prisma.appointment.findFirst({
-      where: {
-        id,
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const appointment = await tx.appointment.findFirst({
+        where: { id, clinicId },
+      });
+
+      if (!appointment) {
+        throw new NotFoundException('Appointment not found');
+      }
+
+      if (
+        appointment.status === AppointmentStatus.COMPLETED ||
+        appointment.status === AppointmentStatus.CANCELLED ||
+        appointment.status === AppointmentStatus.NO_SHOW
+      ) {
+        throw new BadRequestException(
+          `Appointment cannot be cancelled when status is ${appointment.status}`,
+        );
+      }
+
+      const changed = await tx.appointment.update({
+        where: { id: appointment.id },
+        data: {
+          status: AppointmentStatus.CANCELLED,
+          cancellationReason: reason,
+        },
+        include: this.appointmentInclude(),
+      });
+
+      await this.auditService.createInTransaction(tx, {
         clinicId,
-      },
-    });
+        actorId,
+        action: 'UPDATE',
+        entityType: 'Appointment',
+        entityId: changed.id,
+        description: 'Appointment cancelled',
+        metadata: {
+          previousStatus: appointment.status,
+          newStatus: changed.status,
+          reason: reason ?? null,
+        },
+      });
 
-    if (!appointment) {
-      throw new NotFoundException('Appointment not found');
-    }
-
-    if (
-      appointment.status === AppointmentStatus.COMPLETED ||
-      appointment.status === AppointmentStatus.CANCELLED ||
-      appointment.status === AppointmentStatus.NO_SHOW
-    ) {
-      throw new BadRequestException(
-        `Appointment cannot be cancelled when status is ${appointment.status}`,
-      );
-    }
-
-    const updated = await this.prisma.appointment.update({
-      where: {
-        id: appointment.id,
-      },
-
-      data: {
-        status: AppointmentStatus.CANCELLED,
-        cancellationReason: reason,
-      },
-
-      include: this.appointmentInclude(),
-    });
-
-    await this.auditService.create({
-      clinicId,
-      actorId,
-      action: 'UPDATE',
-      entityType: 'Appointment',
-      entityId: updated.id,
-      description: 'Appointment cancelled',
-      metadata: {
-        previousStatus: appointment.status,
-        newStatus: updated.status,
-        reason: reason ?? null,
-      },
+      return changed;
     });
 
     return this.toResponse(updated);
@@ -833,6 +858,23 @@ export class AppointmentsService {
 
       const consultationFee = appointment.consultationFee;
 
+      // Claim the check-in transition conditionally. If two requests race,
+      // only the request that still sees the original status can proceed.
+      const claimed = await tx.appointment.updateMany({
+        where: {
+          id: appointment.id,
+          clinicId,
+          status: appointment.status,
+        },
+        data: { status: AppointmentStatus.CHECKED_IN },
+      });
+
+      if (claimed.count !== 1) {
+        throw new ConflictException(
+          'Appointment status changed; refresh and try again',
+        );
+      }
+
       const invoiceNumber = await this.generateInvoiceNumber(tx, clinicId);
 
       const invoice = await tx.invoice.create({
@@ -863,44 +905,35 @@ export class AppointmentsService {
         },
       });
 
-      const updatedAppointment = await tx.appointment.update({
-        where: {
-          id: appointment.id,
-        },
-        data: {
-          status: AppointmentStatus.CHECKED_IN,
-        },
+      const updatedAppointment = await tx.appointment.findFirst({
+        where: { id: appointment.id, clinicId },
         include: this.appointmentInclude(),
       });
 
-      return {
-        response: this.toResponse(updatedAppointment),
-        appointmentId: updatedAppointment.id,
-        appointmentNumber: updatedAppointment.appointmentNumber,
-        previousStatus: appointment.status,
-        newStatus: updatedAppointment.status,
-        invoiceId: invoice.id,
-        invoiceNumber: invoice.invoiceNumber,
-      };
+      if (!updatedAppointment) {
+        throw new NotFoundException('Appointment not found');
+      }
+
+      await this.auditService.createInTransaction(tx, {
+        clinicId,
+        actorId,
+        action: 'UPDATE',
+        entityType: 'Appointment',
+        entityId: updatedAppointment.id,
+        description: 'Appointment checked in',
+        metadata: {
+          appointmentNumber: updatedAppointment.appointmentNumber,
+          previousStatus: appointment.status,
+          newStatus: updatedAppointment.status,
+          invoiceId: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+        },
+      });
+
+      return this.toResponse(updatedAppointment);
     });
 
-    await this.auditService.create({
-      clinicId,
-      actorId,
-      action: 'UPDATE',
-      entityType: 'Appointment',
-      entityId: result.appointmentId,
-      description: 'Appointment checked in',
-      metadata: {
-        appointmentNumber: result.appointmentNumber,
-        previousStatus: result.previousStatus,
-        newStatus: result.newStatus,
-        invoiceId: result.invoiceId,
-        invoiceNumber: result.invoiceNumber,
-      },
-    });
-
-    return result.response;
+    return result;
   }
 
   /**
@@ -996,30 +1029,24 @@ export class AppointmentsService {
         include: this.appointmentInclude(),
       });
 
-      return {
-        response: this.toResponse(updatedAppointment),
-        appointmentId: updatedAppointment.id,
-        appointmentNumber: updatedAppointment.appointmentNumber,
-        previousStatus: appointment.status,
-        newStatus: updatedAppointment.status,
-      };
+      await this.auditService.createInTransaction(tx, {
+        clinicId,
+        actorId,
+        action: 'UPDATE',
+        entityType: 'Appointment',
+        entityId: updatedAppointment.id,
+        description: 'Appointment completed',
+        metadata: {
+          appointmentNumber: updatedAppointment.appointmentNumber,
+          previousStatus: appointment.status,
+          newStatus: updatedAppointment.status,
+        },
+      });
+
+      return this.toResponse(updatedAppointment);
     });
 
-    await this.auditService.create({
-      clinicId,
-      actorId,
-      action: 'UPDATE',
-      entityType: 'Appointment',
-      entityId: result.appointmentId,
-      description: 'Appointment completed',
-      metadata: {
-        appointmentNumber: result.appointmentNumber,
-        previousStatus: result.previousStatus,
-        newStatus: result.newStatus,
-      },
-    });
-
-    return result.response;
+    return result;
   }
 
   /**
@@ -1468,43 +1495,38 @@ export class AppointmentsService {
     status: AppointmentStatus,
     actorId: string,
   ) {
-    const appointment = await this.prisma.appointment.findFirst({
-      where: {
-        id,
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const appointment = await tx.appointment.findFirst({
+        where: { id, clinicId },
+      });
+
+      if (!appointment) {
+        throw new NotFoundException('Appointment not found');
+      }
+
+      this.validateStatusTransition(appointment.status, status);
+
+      const changed = await tx.appointment.update({
+        where: { id: appointment.id },
+        data: { status },
+        include: this.appointmentInclude(),
+      });
+
+      await this.auditService.createInTransaction(tx, {
         clinicId,
-      },
-    });
+        actorId,
+        action: 'UPDATE',
+        entityType: 'Appointment',
+        entityId: changed.id,
+        description: `Appointment status changed to ${changed.status}`,
+        metadata: {
+          appointmentNumber: changed.appointmentNumber,
+          previousStatus: appointment.status,
+          newStatus: changed.status,
+        },
+      });
 
-    if (!appointment) {
-      throw new NotFoundException('Appointment not found');
-    }
-
-    this.validateStatusTransition(appointment.status, status);
-
-    const updated = await this.prisma.appointment.update({
-      where: {
-        id: appointment.id,
-      },
-
-      data: {
-        status,
-      },
-
-      include: this.appointmentInclude(),
-    });
-
-    await this.auditService.create({
-      clinicId,
-      actorId,
-      action: 'UPDATE',
-      entityType: 'Appointment',
-      entityId: updated.id,
-      description: `Appointment status changed to ${updated.status}`,
-      metadata: {
-        appointmentNumber: updated.appointmentNumber,
-        previousStatus: appointment.status,
-        newStatus: updated.status,
-      },
+      return changed;
     });
 
     return this.toResponse(updated);
@@ -1679,7 +1701,45 @@ export class AppointmentsService {
     return start1 < end2 && end1 > start2;
   }
 
+  private async findConflictingAppointmentWithClient(
+    client: Prisma.TransactionClient,
+    clinicId: string,
+    doctorId: string,
+    appointmentDate: Date,
+    startTime: string,
+    endTime: string,
+    excludeAppointmentId?: string,
+  ) {
+    const appointments = await client.appointment.findMany({
+      where: {
+        clinicId,
+        doctorId,
+        appointmentDate: {
+          gte: appointmentDate,
+          lt: this.nextDate(appointmentDate),
+        },
+        status: {
+          notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW],
+        },
+        ...(excludeAppointmentId && { id: { not: excludeAppointmentId } }),
+      },
+      select: { id: true, startTime: true, endTime: true },
+    });
+
+    return (
+      appointments.find((appointment) =>
+        this.timesOverlap(
+          startTime,
+          endTime,
+          appointment.startTime,
+          appointment.endTime,
+        ),
+      ) ?? null
+    );
+  }
+
   private async findConflictingAppointment(
+    clinicId: string,
     doctorId: string,
     appointmentDate: Date,
     startTime: string,
@@ -1688,6 +1748,7 @@ export class AppointmentsService {
   ) {
     const appointments = await this.prisma.appointment.findMany({
       where: {
+        clinicId,
         doctorId,
 
         appointmentDate: {
@@ -1814,10 +1875,13 @@ export class AppointmentsService {
     return next;
   }
 
-  private async generateAppointmentNumber(clinicId: string): Promise<string> {
+  private async generateAppointmentNumber(
+    clinicId: string,
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<string> {
     const year = new Date().getFullYear();
 
-    const lastAppointment = await this.prisma.appointment.findFirst({
+    const lastAppointment = await client.appointment.findFirst({
       where: {
         clinicId,
         appointmentNumber: {
@@ -1924,34 +1988,43 @@ export class AppointmentsService {
     tx: Prisma.TransactionClient,
     clinicId: string,
   ): Promise<string> {
-    const clinic = await tx.clinic.findUnique({
-      where: {
-        id: clinicId,
-      },
-      select: {
-        code: true,
-      },
-    });
-
-    if (!clinic) {
-      throw new NotFoundException('Clinic not found');
-    }
-
+    // Existing invoices may predate invoiceSequence, so the persisted counter
+    // can lag behind numbers already in use. Increment atomically and skip any
+    // existing number. The Clinic row update serializes counter increments for
+    // this clinic; checking the candidate prevents legacy-number collisions.
     const year = new Date().getFullYear();
 
-    const count = await tx.invoice.count({
-      where: {
-        clinicId,
+    for (let attempt = 0; attempt < 1000; attempt += 1) {
+      const clinic = await tx.clinic
+        .update({
+          where: { id: clinicId },
+          data: { invoiceSequence: { increment: 1 } },
+          select: { code: true, invoiceSequence: true },
+        })
+        .catch((error: unknown) => {
+          if (
+            error instanceof Prisma.PrismaClientKnownRequestError &&
+            error.code === 'P2025'
+          ) {
+            throw new NotFoundException('Clinic not found');
+          }
+          throw error;
+        });
 
-        createdAt: {
-          gte: new Date(`${year}-01-01T00:00:00.000Z`),
+      const candidate = `INV-${clinic.code}-${year}-${String(clinic.invoiceSequence).padStart(6, '0')}`;
+      const existing = await tx.invoice.findFirst({
+        where: { clinicId, invoiceNumber: candidate },
+        select: { id: true },
+      });
 
-          lt: new Date(`${year + 1}-01-01T00:00:00.000Z`),
-        },
-      },
-    });
+      if (!existing) {
+        return candidate;
+      }
+    }
 
-    return `INV-${clinic.code}-${year}-${String(count + 1).padStart(6, '0')}`;
+    throw new ConflictException(
+      'Unable to allocate a unique invoice number. Please retry the operation.',
+    );
   }
 }
 

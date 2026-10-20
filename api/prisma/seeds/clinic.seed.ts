@@ -1,6 +1,9 @@
 import { PrismaClient } from '@prisma/client';
 
-export async function seedClinic(prisma: PrismaClient) {
+export async function seedClinic(
+  prisma: PrismaClient,
+  platformAdminEmail: string,
+) {
   console.log('🌱 Seeding clinic...');
   return prisma.clinic.upsert({
     where: {
@@ -11,7 +14,7 @@ export async function seedClinic(prisma: PrismaClient) {
       code: 'CLINIC001',
       name: 'SamaRoot Demo Clinic',
 
-      email: 'admin@samaroot.com',
+      email: platformAdminEmail,
       phone: '+1-555-123-4567',
 
       website: 'https://samaroot.demo',

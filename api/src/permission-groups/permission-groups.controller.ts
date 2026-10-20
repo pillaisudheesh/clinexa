@@ -10,11 +10,7 @@ import {
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-
-import { Roles } from '../auth/decorators/roles.decorator';
-
-import { RoleName } from '../auth/enums/role.enum';
+import { PlatformAdminGuard } from '../auth/guards/platform-admin.guard';
 
 import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
 
@@ -26,8 +22,7 @@ import { PermissionGroupsService } from './permission-groups.service';
 @ApiTags('Permission Groups')
 @ApiBearerAuth()
 @Controller('permission-groups')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(RoleName.SUPER_ADMIN)
+@UseGuards(JwtAuthGuard, PlatformAdminGuard)
 export class PermissionGroupsController {
   constructor(
     private readonly permissionGroupsService: PermissionGroupsService,

@@ -11,6 +11,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 
 import { RegistrationCouncilQueryDto } from './dto/registration-council-query.dto';
@@ -19,7 +20,7 @@ import { RegistrationCouncilService } from './registration-council.service';
 @ApiTags('Registration Councils')
 @ApiBearerAuth()
 @Controller('registration-councils')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class RegistrationCouncilController {
   constructor(
     private readonly registrationCouncilsService: RegistrationCouncilService,

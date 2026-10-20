@@ -135,10 +135,10 @@ enum InvoiceType {
 model Clinic {
   id String @id @default(uuid())
 
-  code String @unique
-  name String
-  logoUrl String? @db.Text
-  tagline String?
+  code       String  @unique
+  name       String
+  logoUrl    String? @db.Text
+  tagline    String?
   brandColor String? @default("#0F766E")
 
   email   String?
@@ -157,8 +157,8 @@ model Clinic {
 
   isActive Boolean @default(true)
 
-  users User[]
-  roles Role[]
+  users        User[]
+  roles        Role[]
   workingHours ClinicWorkingHours?
 
   patients    Patient[]
@@ -176,24 +176,24 @@ model Clinic {
   inventoryTransactions InventoryTransaction[]
   pharmacyDispensings   PharmacyDispensing[]
   stockReceipts         StockReceipt[]
-  prescriptionSequence Int @default(0)
-  invoiceSequence      Int @default(0)
+  prescriptionSequence  Int                    @default(0)
+  invoiceSequence       Int                    @default(0)
+  patientSequence       Int                    @default(0)
 
   @@index([isActive])
 }
 
-
 model ClinicWorkingHours {
-  id String @id @default(uuid())
-  clinicId String @unique
-  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  openingTime String @default("09:00")
-  closingTime String @default("18:00")
-  defaultAppointmentDuration Int @default(30)
+  id                         String   @id @default(uuid())
+  clinicId                   String   @unique
+  clinic                     Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  openingTime                String   @default("09:00")
+  closingTime                String   @default("18:00")
+  defaultAppointmentDuration Int      @default(30)
   // Comma-separated uppercase weekdays: MONDAY,TUESDAY,...
-  workingDays String @default("MONDAY,TUESDAY,WEDNESDAY,THURSDAY,FRIDAY,SATURDAY")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  workingDays                String   @default("MONDAY,TUESDAY,WEDNESDAY,THURSDAY,FRIDAY,SATURDAY")
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
 }
 
 model User {
@@ -700,7 +700,7 @@ model Appointment {
   updatedAt DateTime @updatedAt
 
   medicalRecord MedicalRecord?
-  invoices Invoice[]
+  invoices      Invoice[]
   labOrders     LabOrder[]
 
   @@unique([clinicId, appointmentNumber])
@@ -789,9 +789,9 @@ model Prescription {
 
   instructions String?
 
-  createdAt  DateTime            @default(now())
-  dispensing PharmacyDispensing?
-  prescriptionNumber String @unique
+  createdAt          DateTime            @default(now())
+  dispensing         PharmacyDispensing?
+  prescriptionNumber String              @unique
 
   @@index([medicalRecordId])
   @@index([medicineId])
@@ -832,7 +832,7 @@ model Invoice {
   items               InvoiceItem[]
   payments            Payment[]
   pharmacyDispensings PharmacyDispensing[]
-  type InvoiceType @default(CONSULTATION)
+  type                InvoiceType          @default(CONSULTATION)
 
   @@unique([clinicId, invoiceNumber])
   @@index([clinicId])
@@ -1201,16 +1201,16 @@ model StockReceiptItem {
 }
 
 model AuditLog {
-  id          String   @id @default(cuid())
-  clinicId    String?
-  userId      String?
-  action      String
-  entity      String?
-  entityId    String?
-  details     Json?
-  ipAddress   String?
-  userAgent   String?
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  clinicId  String?
+  userId    String?
+  action    String
+  entity    String?
+  entityId  String?
+  details   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
 
   @@index([clinicId, createdAt])
   @@index([userId, createdAt])

@@ -8,31 +8,23 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-
 import {
   ApiBearerAuth,
   ApiOperation,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-
 import { Request } from 'express';
-
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { PermissionCodes } from '../auth/constants/permission-codes';
-
 import { DispensingService } from './dispensing.service';
-
 import { DispensePrescriptionDto } from './dto/dispense-prescription.dto';
 import { DispensingResponseDto } from './dto/dispensing-response.dto';
 
 interface AuthenticatedRequest extends Request {
-  user: {
-    id: string;
-    clinicId: string;
-  };
+  user: { id: string; clinicId: string };
 }
 
 @ApiTags('Pharmacy Dispensing')
@@ -41,10 +33,6 @@ interface AuthenticatedRequest extends Request {
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class DispensingController {
   constructor(private readonly dispensingService: DispensingService) {}
-
-  // ===========================================================================
-  // DISPENSE PRESCRIPTION
-  // ===========================================================================
 
   @Post('prescriptions/:prescriptionId')
   @Permissions(PermissionCodes.PHARMACY_UPDATE)
@@ -63,10 +51,7 @@ export class DispensingController {
     description:
       'Invalid prescription quantity, insufficient stock, expired stock, or invalid invoice.',
   })
-  @ApiResponse({
-    status: 403,
-    description: 'Insufficient permissions.',
-  })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions.' })
   @ApiResponse({
     status: 404,
     description: 'Prescription or invoice not found.',
@@ -77,53 +62,32 @@ export class DispensingController {
   })
   dispense(
     @Req() req: AuthenticatedRequest,
-    @Param('prescriptionId', new ParseUUIDPipe())
-    prescriptionId: string,
-    @Body()
-    dto: DispensePrescriptionDto,
+    @Param('prescriptionId', new ParseUUIDPipe()) prescriptionId: string,
+    @Body() dto: DispensePrescriptionDto,
   ): Promise<DispensingResponseDto> {
     return this.dispensingService.dispense(
       req.user.clinicId,
       prescriptionId,
       dto,
+      req.user.id,
     );
   }
 
-  // ===========================================================================
-  // GET DISPENSING BY PRESCRIPTION
-  // ===========================================================================
-
   @Get('prescriptions/:prescriptionId')
   @Permissions(PermissionCodes.PHARMACY_READ)
-  @ApiOperation({
-    summary: 'Get dispensing record for prescription',
-  })
-  @ApiResponse({
-    status: 200,
-    type: DispensingResponseDto,
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Insufficient permissions.',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Dispensing record not found.',
-  })
+  @ApiOperation({ summary: 'Get dispensing record for prescription' })
+  @ApiResponse({ status: 200, type: DispensingResponseDto })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions.' })
+  @ApiResponse({ status: 404, description: 'Dispensing record not found.' })
   findByPrescription(
     @Req() req: AuthenticatedRequest,
-    @Param('prescriptionId', new ParseUUIDPipe())
-    prescriptionId: string,
+    @Param('prescriptionId', new ParseUUIDPipe()) prescriptionId: string,
   ): Promise<DispensingResponseDto> {
     return this.dispensingService.findByPrescription(
       req.user.clinicId,
       prescriptionId,
     );
   }
-
-  // ===========================================================================
-  // CANCEL DISPENSING
-  // ===========================================================================
 
   @Post(':id/cancel')
   @Permissions(PermissionCodes.PHARMACY_UPDATE)
@@ -137,14 +101,8 @@ export class DispensingController {
     description: 'Dispensing cancelled successfully.',
     type: DispensingResponseDto,
   })
-  @ApiResponse({
-    status: 400,
-    description: 'Dispensing cannot be cancelled.',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Insufficient permissions.',
-  })
+  @ApiResponse({ status: 400, description: 'Dispensing cannot be cancelled.' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions.' })
   @ApiResponse({
     status: 404,
     description: 'Dispensing record or invoice not found.',
@@ -155,9 +113,8 @@ export class DispensingController {
   })
   cancel(
     @Req() req: AuthenticatedRequest,
-    @Param('id', new ParseUUIDPipe())
-    id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
   ): Promise<DispensingResponseDto> {
-    return this.dispensingService.cancel(req.user.clinicId, id);
+    return this.dispensingService.cancel(req.user.clinicId, id, req.user.id);
   }
 }

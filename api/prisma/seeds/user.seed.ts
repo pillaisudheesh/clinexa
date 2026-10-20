@@ -5,26 +5,42 @@ export async function seedUsers(
   prisma: PrismaClient,
   clinicId: string,
   roles: Record<string, string>,
+  platformAdminEmail: string,
+  platformAdminPassword: string,
 ) {
-  const passwordHash = await bcrypt.hash('Admin@123', 10);
+  const passwordHash = await bcrypt.hash(platformAdminPassword, 12);
+
   console.log('🌱 Seeding users...');
+
+  // Retire the legacy seeded account when a different administrator email is configured.
+  // The old seed shipped with a publicly known password and must not remain usable.
+  if (platformAdminEmail.toLowerCase() !== 'admin@samaroot.com') {
+    await prisma.user.updateMany({
+      where: { email: 'admin@samaroot.com' },
+      data: {
+        isPlatformAdmin: false,
+        status: UserStatus.INACTIVE,
+      },
+    });
+  }
 
   const admin = await prisma.user.upsert({
     where: {
-      email: 'admin@samaroot.com',
+      email: platformAdminEmail,
     },
-    update: {},
+    update: {
+      passwordHash,
+      isPlatformAdmin: true,
+      status: UserStatus.ACTIVE,
+    },
     create: {
       clinicId,
-
       firstName: 'System',
       lastName: 'Administrator',
-
-      email: 'admin@samaroot.com',
-
+      email: platformAdminEmail,
       passwordHash,
-
       status: UserStatus.ACTIVE,
+      isPlatformAdmin: true,
     },
   });
 
@@ -42,5 +58,5 @@ export async function seedUsers(
     },
   });
 
-  console.log('✅ Users seeded.');
+  console.log('✅ Platform Super Administrator seeded.');
 }

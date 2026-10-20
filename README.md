@@ -9,11 +9,21 @@ npx prisma validate
 npx prisma migrate dev --name role-improvements
 npx primsa studio
 
-{
-"email": "admin@samaroot.com",
-"password": "Admin@123"
-}
-npx prisma db seed
+## Local environment setup
+
+Create `api/.env` from `api/.env.example`, set `DATABASE_URL`, and generate a unique JWT secret:
+
+```bash
+cd api
+cp .env.example .env
+openssl rand -base64 48
+```
+
+Put the generated value in `JWT_SECRET`. Do not commit `.env` files. Before running `npm run db:seed`, set `PLATFORM_ADMIN_EMAIL` and a unique `PLATFORM_ADMIN_PASSWORD` of at least 16 characters in `api/.env`. The seed script will reject missing or weak credentials. If upgrading a database created by the old seed, the legacy `admin@samaroot.com` account is disabled when you configure a different administrator email.
+
+```bash
+npm run db:seed
+```
 
 {
 "code": "CLN001",

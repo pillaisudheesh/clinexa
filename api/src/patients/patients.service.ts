@@ -117,39 +117,43 @@ export class PatientsService {
     const patientNumber =
       await this.numberGenerator.generatePatientNumber(clinicId);
 
-    const patient = await this.prisma.patient.create({
-      data: {
-        clinicId,
-        patientNumber,
-        firstName: dto.firstName,
-        middleName: dto.middleName,
-        lastName: dto.lastName,
-        gender: dto.gender,
-        dateOfBirth: new Date(dto.dateOfBirth),
-        phone: dto.phone,
-        email: dto.email,
-        bloodGroup: dto.bloodGroup,
-        maritalStatus: dto.maritalStatus,
-        addressLine1: dto.addressLine1,
-        addressLine2: dto.addressLine2,
-        city: dto.city,
-        state: dto.state,
-        country: dto.country,
-        postalCode: dto.postalCode,
-        emergencyContactName: dto.emergencyContactName,
-        emergencyContactPhone: dto.emergencyContactPhone,
-        emergencyContactRelation: dto.emergencyContactRelation,
-      },
-      include: { clinic: true },
-    });
+    const patient = await this.prisma.$transaction(async (tx) => {
+      const createdPatient = await tx.patient.create({
+        data: {
+          clinicId,
+          patientNumber,
+          firstName: dto.firstName,
+          middleName: dto.middleName,
+          lastName: dto.lastName,
+          gender: dto.gender,
+          dateOfBirth: new Date(dto.dateOfBirth),
+          phone: dto.phone,
+          email: dto.email,
+          bloodGroup: dto.bloodGroup,
+          maritalStatus: dto.maritalStatus,
+          addressLine1: dto.addressLine1,
+          addressLine2: dto.addressLine2,
+          city: dto.city,
+          state: dto.state,
+          country: dto.country,
+          postalCode: dto.postalCode,
+          emergencyContactName: dto.emergencyContactName,
+          emergencyContactPhone: dto.emergencyContactPhone,
+          emergencyContactRelation: dto.emergencyContactRelation,
+        },
+        include: { clinic: true },
+      });
 
-    await this.auditService.create({
-      clinicId,
-      actorId: userId,
-      action: 'CREATE',
-      entityType: 'Patient',
-      entityId: patient.id,
-      description: 'Patient created',
+      await this.auditService.createInTransaction(tx, {
+        clinicId,
+        actorId: userId,
+        action: 'CREATE',
+        entityType: 'Patient',
+        entityId: createdPatient.id,
+        description: 'Patient created',
+      });
+
+      return createdPatient;
     });
 
     return PatientMapper.toResponseDto(patient);
@@ -174,36 +178,40 @@ export class PatientsService {
       if (exists) throw new ConflictException('Email already exists.');
     }
 
-    const patient = await this.prisma.patient.update({
-      where: { id },
-      data: {
-        ...dto,
-        ...(dto.dateOfBirth && { dateOfBirth: new Date(dto.dateOfBirth) }),
-      },
-      include: { clinic: true },
-    });
-
-    const changedFields = Object.keys(dto).filter((key) => {
-      const before = existingPatient[key as keyof typeof existingPatient];
-      const after = patient[key as keyof typeof patient];
-
-      if (before instanceof Date && after instanceof Date) {
-        return before.getTime() !== after.getTime();
-      }
-      return before !== after;
-    });
-
-    if (changedFields.length > 0) {
-      await this.auditService.create({
-        clinicId,
-        actorId: userId,
-        action: 'UPDATE',
-        entityType: 'Patient',
-        entityId: patient.id,
-        description: 'Patient updated',
-        metadata: { changedFields },
+    const patient = await this.prisma.$transaction(async (tx) => {
+      const updatedPatient = await tx.patient.update({
+        where: { id, clinicId },
+        data: {
+          ...dto,
+          ...(dto.dateOfBirth && { dateOfBirth: new Date(dto.dateOfBirth) }),
+        },
+        include: { clinic: true },
       });
-    }
+
+      const changedFields = Object.keys(dto).filter((key) => {
+        const before = existingPatient[key as keyof typeof existingPatient];
+        const after = updatedPatient[key as keyof typeof updatedPatient];
+
+        if (before instanceof Date && after instanceof Date) {
+          return before.getTime() !== after.getTime();
+        }
+        return before !== after;
+      });
+
+      if (changedFields.length > 0) {
+        await this.auditService.createInTransaction(tx, {
+          clinicId,
+          actorId: userId,
+          action: 'UPDATE',
+          entityType: 'Patient',
+          entityId: updatedPatient.id,
+          description: 'Patient updated',
+          metadata: { changedFields },
+        });
+      }
+
+      return updatedPatient;
+    });
 
     return PatientMapper.toResponseDto(patient);
   }
@@ -216,26 +224,30 @@ export class PatientsService {
   ): Promise<PatientResponseDto> {
     const existingPatient = await this.getPatientOrThrow(clinicId, id);
 
-    const patient = await this.prisma.patient.update({
-      where: { id },
-      data: { isActive: dto.isActive },
-      include: { clinic: true },
-    });
-
-    if (existingPatient.isActive !== dto.isActive) {
-      await this.auditService.create({
-        clinicId,
-        actorId: userId,
-        action: dto.isActive ? 'ACTIVATE' : 'DEACTIVATE',
-        entityType: 'Patient',
-        entityId: patient.id,
-        description: dto.isActive ? 'Patient activated' : 'Patient deactivated',
-        metadata: {
-          previousIsActive: existingPatient.isActive,
-          isActive: patient.isActive,
-        },
+    const patient = await this.prisma.$transaction(async (tx) => {
+      const updatedPatient = await tx.patient.update({
+        where: { id, clinicId },
+        data: { isActive: dto.isActive },
+        include: { clinic: true },
       });
-    }
+
+      if (existingPatient.isActive !== dto.isActive) {
+        await this.auditService.createInTransaction(tx, {
+          clinicId,
+          actorId: userId,
+          action: dto.isActive ? 'ACTIVATE' : 'DEACTIVATE',
+          entityType: 'Patient',
+          entityId: updatedPatient.id,
+          description: dto.isActive ? 'Patient activated' : 'Patient deactivated',
+          metadata: {
+            previousIsActive: existingPatient.isActive,
+            isActive: updatedPatient.isActive,
+          },
+        });
+      }
+
+      return updatedPatient;
+    });
 
     return PatientMapper.toResponseDto(patient);
   }

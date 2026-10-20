@@ -1,17 +1,13 @@
 import { PaymentMethod } from '@prisma/client';
-
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-
-import { IsDecimal, IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsOptional, IsString, Matches } from 'class-validator';
 
 export class CreatePaymentDto {
-  @ApiProperty()
-  @IsDecimal()
+  @ApiProperty({ example: '250.00', description: 'Must be greater than zero' })
+  @Matches(/^\d+(\.\d{1,2})?$/)
   amount!: string;
 
-  @ApiProperty({
-    enum: PaymentMethod,
-  })
+  @ApiProperty({ enum: PaymentMethod })
   @IsEnum(PaymentMethod)
   method!: PaymentMethod;
 

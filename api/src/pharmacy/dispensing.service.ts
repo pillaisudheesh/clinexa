@@ -14,6 +14,7 @@ import {
 } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 
 import { DispensePrescriptionDto } from './dto/dispense-prescription.dto';
 import {
@@ -23,7 +24,10 @@ import {
 
 @Injectable()
 export class DispensingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   // ===========================================================================
   // DISPENSE
@@ -33,6 +37,7 @@ export class DispensingService {
     clinicId: string,
     prescriptionId: string,
     dto: DispensePrescriptionDto,
+    actorId: string,
   ): Promise<DispensingResponseDto> {
     return this.prisma.$transaction(async (tx) => {
       // -----------------------------------------------------------------------
@@ -131,36 +136,6 @@ export class DispensingService {
         });
 
         invoiceId = invoice.id;
-      }
-
-      let pharmacyInvoiceId = invoiceId;
-
-      if (!pharmacyInvoiceId) {
-        const invoiceNumber = await this.generateInvoiceNumber(tx, clinicId);
-
-        const pharmacyInvoice = await tx.invoice.create({
-          data: {
-            clinicId,
-            patientId: prescription.medicalRecord.appointmentId
-              ? prescription.medicalRecord.appointmentId
-              : '',
-            appointmentId: prescription.medicalRecord.appointmentId,
-            invoiceNumber,
-            type: InvoiceType.PHARMACY,
-            status: InvoiceStatus.DRAFT,
-            subtotal: 0,
-            discount: 0,
-            tax: 0,
-            total: 0,
-            amountPaid: 0,
-            balanceDue: 0,
-          },
-          select: {
-            id: true,
-          },
-        });
-
-        pharmacyInvoiceId = pharmacyInvoice.id;
       }
 
       // -----------------------------------------------------------------------
@@ -307,7 +282,9 @@ export class DispensingService {
             clinicId,
             isActive: true,
             expiryDate: { gt: now },
-            quantity: { gte: quantityToDispense },
+            // Require the exact quantity read above. Using only gte here can
+            // overwrite a concurrent stock change and make the ledger wrong.
+            quantity: batch.quantity,
           },
           data: { quantity: newQuantity },
         });
@@ -412,6 +389,23 @@ export class DispensingService {
       if (!result) {
         throw new NotFoundException('Dispensing record not found');
       }
+
+      await this.auditService.createInTransaction(tx, {
+        clinicId,
+        actorId,
+        action: 'DISPENSE',
+        entityType: 'PharmacyDispensing',
+        entityId: dispensing.id,
+        description: `Dispensed ${requestedQuantity} unit(s) for prescription ${prescriptionId}.`,
+        metadata: {
+          prescriptionId,
+          status: dispensingStatus,
+          requestedQuantity,
+          batchAllocations: dispensingItemIds.length,
+          invoiceId,
+          notes: dto.notes ?? null,
+        },
+      });
 
       return this.mapDispensing(result);
     });
@@ -604,7 +598,11 @@ export class DispensingService {
   // CANCEL DISPENSING
   // ===========================================================================
 
-  async cancel(clinicId: string, id: string): Promise<DispensingResponseDto> {
+  async cancel(
+    clinicId: string,
+    id: string,
+    actorId: string,
+  ): Promise<DispensingResponseDto> {
     return this.prisma.$transaction(async (tx) => {
       // -----------------------------------------------------------------------
       // 1. Find dispensing record
@@ -630,15 +628,56 @@ export class DispensingService {
       }
 
       // -----------------------------------------------------------------------
-      // 2. Prevent duplicate cancellation
+      // 2. Prevent duplicate cancellation and validate invoice first
       // -----------------------------------------------------------------------
 
       if (dispensing.status === PharmacyDispensingStatus.CANCELLED) {
         throw new ConflictException('Dispensing has already been cancelled');
       }
 
+      // Do not alter stock or invoice items if the invoice has already been
+      // finalized, paid, or otherwise moved out of DRAFT status.
+      if (dispensing.invoiceId) {
+        const invoice = await tx.invoice.findFirst({
+          where: {
+            id: dispensing.invoiceId,
+            clinicId,
+          },
+          select: {
+            id: true,
+            status: true,
+          },
+        });
+
+        if (!invoice) {
+          throw new NotFoundException('Invoice not found');
+        }
+
+        if (invoice.status !== InvoiceStatus.DRAFT) {
+          throw new ConflictException(
+            'Dispensing cannot be cancelled because its invoice is no longer in draft status',
+          );
+        }
+      }
+
+      // Claim cancellation atomically so two concurrent requests cannot both
+      // restore the same stock. This update rolls back if any later step fails.
+      const cancellationClaim = await tx.pharmacyDispensing.updateMany({
+        where: {
+          id: dispensing.id,
+          clinicId,
+          status: dispensing.status,
+        },
+        data: { status: PharmacyDispensingStatus.CANCELLED },
+      });
+      if (cancellationClaim.count !== 1) {
+        throw new ConflictException(
+          'Dispensing was changed by another request; refresh and retry',
+        );
+      }
+
       // -----------------------------------------------------------------------
-      // 3. Validate invoice
+      // 3. Remove dispensing invoice items and recalculate once
       // -----------------------------------------------------------------------
 
       if (dispensing.invoiceId) {
@@ -651,16 +690,10 @@ export class DispensingService {
           },
         });
 
-        // ---------------------------------------------------------------------
-        // Recalculate invoice
-        // ---------------------------------------------------------------------
-
         await this.recalculateInvoice(tx, dispensing.invoiceId);
 
-        // ---------------------------------------------------------------------
-        // Cancel invoice when no charges remain
-        // ---------------------------------------------------------------------
-
+        // Preserve the invoice for audit history, but cancel an empty draft
+        // invoice. Invoices with other charges remain draft and unchanged in status.
         const remainingInvoiceItems = await tx.invoiceItem.count({
           where: {
             invoiceId: dispensing.invoiceId,
@@ -668,14 +701,22 @@ export class DispensingService {
         });
 
         if (remainingInvoiceItems === 0) {
-          await tx.invoice.update({
+          const invoiceCancellation = await tx.invoice.updateMany({
             where: {
               id: dispensing.invoiceId,
+              clinicId,
+              status: InvoiceStatus.DRAFT,
             },
             data: {
               status: InvoiceStatus.CANCELLED,
             },
           });
+
+          if (invoiceCancellation.count !== 1) {
+            throw new ConflictException(
+              'Invoice status changed while cancelling dispensing; no changes were committed',
+            );
+          }
         }
       }
 
@@ -703,14 +744,21 @@ export class DispensingService {
         // Restore stock
         // ---------------------------------------------------------------------
 
-        await tx.medicineBatch.update({
+        const stockRestore = await tx.medicineBatch.updateMany({
           where: {
             id: batch.id,
+            clinicId,
+            quantity: batch.quantity,
           },
           data: {
             quantity: newQuantity,
           },
         });
+        if (stockRestore.count !== 1) {
+          throw new ConflictException(
+            `Stock changed while cancelling dispensing for batch ${batch.batchNumber}; please retry`,
+          );
+        }
 
         // ---------------------------------------------------------------------
         // Create RETURN inventory transaction
@@ -735,28 +783,6 @@ export class DispensingService {
             notes: `Stock returned due to cancellation of dispensing ${dispensing.id}`,
           },
         });
-      }
-
-      // -----------------------------------------------------------------------
-      // 5. Remove pharmacy invoice items
-      // -----------------------------------------------------------------------
-
-      if (dispensing.invoiceId) {
-        await tx.invoiceItem.deleteMany({
-          where: {
-            invoiceId: dispensing.invoiceId,
-
-            pharmacyDispensingItemId: {
-              in: dispensing.items.map((item) => item.id),
-            },
-          },
-        });
-
-        // ---------------------------------------------------------------------
-        // Recalculate invoice
-        // ---------------------------------------------------------------------
-
-        await this.recalculateInvoice(tx, dispensing.invoiceId);
       }
 
       // -----------------------------------------------------------------------
@@ -798,6 +824,25 @@ export class DispensingService {
       if (!result) {
         throw new NotFoundException('Dispensing record not found');
       }
+
+      await this.auditService.createInTransaction(tx, {
+        clinicId,
+        actorId,
+        action: 'CANCEL',
+        entityType: 'PharmacyDispensing',
+        entityId: dispensing.id,
+        description: `Cancelled dispensing ${dispensing.id} and returned stock to original batches.`,
+        metadata: {
+          prescriptionId: dispensing.prescriptionId,
+          invoiceId: dispensing.invoiceId,
+          returnedItems: dispensing.items.map((item) => ({
+            medicineId: item.medicineId,
+            medicineBatchId: item.medicineBatchId,
+            batchNumber: item.medicineBatch.batchNumber,
+            quantity: item.quantity,
+          })),
+        },
+      });
 
       return this.mapDispensing(result);
     });
@@ -864,31 +909,37 @@ export class DispensingService {
     tx: Prisma.TransactionClient,
     clinicId: string,
   ): Promise<string> {
-    const clinic = await tx.clinic.findUnique({
-      where: {
-        id: clinicId,
-      },
-      select: {
-        code: true,
-      },
-    });
-
-    if (!clinic) {
-      throw new NotFoundException('Clinic not found');
-    }
-
     const year = new Date().getFullYear();
 
-    const count = await tx.invoice.count({
-      where: {
-        clinicId,
-        createdAt: {
-          gte: new Date(`${year}-01-01T00:00:00.000Z`),
-          lt: new Date(`${year + 1}-01-01T00:00:00.000Z`),
-        },
-      },
-    });
+    // The persisted counter is concurrency-safe for this clinic. The existence
+    // check also handles legacy invoices created before the counter was used.
+    for (let attempt = 0; attempt < 1000; attempt += 1) {
+      const clinic = await tx.clinic
+        .update({
+          where: { id: clinicId },
+          data: { invoiceSequence: { increment: 1 } },
+          select: { code: true, invoiceSequence: true },
+        })
+        .catch((error: unknown) => {
+          if (
+            error instanceof Prisma.PrismaClientKnownRequestError &&
+            error.code === 'P2025'
+          ) {
+            throw new NotFoundException('Clinic not found');
+          }
+          throw error;
+        });
 
-    return `INV-${clinic.code}-${year}-${String(count + 1).padStart(6, '0')}`;
+      const candidate = `INV-${clinic.code}-${year}-${String(clinic.invoiceSequence).padStart(6, '0')}`;
+      const existing = await tx.invoice.findFirst({
+        where: { clinicId, invoiceNumber: candidate },
+        select: { id: true },
+      });
+      if (!existing) return candidate;
+    }
+
+    throw new ConflictException(
+      'Unable to allocate a unique invoice number. Please retry the operation.',
+    );
   }
 }

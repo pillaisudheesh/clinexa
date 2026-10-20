@@ -239,6 +239,7 @@ export class LabTestsService {
       const updatedLabTest = await this.prisma.labTest.update({
         where: {
           id,
+          clinicId,
         },
 
         data: {
@@ -310,6 +311,7 @@ export class LabTestsService {
     const updatedLabTest = await this.prisma.labTest.update({
       where: {
         id,
+        clinicId,
       },
 
       data: {

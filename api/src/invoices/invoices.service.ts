@@ -353,7 +353,7 @@ export class InvoicesService {
       }
 
       return tx.invoice.update({
-        where: { id },
+        where: { id, clinicId },
         data: {
           subtotal: this.decimal(subtotal),
           discount: this.decimal(discount),
@@ -414,7 +414,7 @@ export class InvoicesService {
       });
 
       return tx.invoice.update({
-        where: { id: invoiceId },
+        where: { id: invoiceId, clinicId },
         data: {
           subtotal: this.decimal(subtotal),
           total: this.decimal(total),
@@ -479,7 +479,7 @@ export class InvoicesService {
       });
 
       return tx.invoice.update({
-        where: { id: invoiceId },
+        where: { id: invoiceId, clinicId },
         data: {
           subtotal: this.decimal(subtotal),
           total: this.decimal(total),
@@ -666,7 +666,7 @@ export class InvoicesService {
 
     const updatedInvoice = await this.prisma.$transaction(async (tx) => {
       return tx.invoice.update({
-        where: { id },
+        where: { id, clinicId },
         data: {
           subtotal: this.decimal(subtotal),
           total: this.decimal(total),
@@ -705,7 +705,7 @@ export class InvoicesService {
     }
 
     const updatedInvoice = await this.prisma.invoice.update({
-      where: { id },
+      where: { id, clinicId },
       data: {
         status: InvoiceStatus.CANCELLED,
       },

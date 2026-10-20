@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -23,6 +24,15 @@ import { seedLabTests } from '../../prisma/seeds/lab-test.seed';
 @Injectable()
 export class ClinicsService {
   constructor(private readonly prisma: PrismaService) {}
+
+
+  private validateTimezone(timezone: string): void {
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format(new Date(0));
+    } catch {
+      throw new BadRequestException(`Invalid clinic timezone: ${timezone}`);
+    }
+  }
 
   async findByCode(code: string) {
     return this.prisma.clinic.findUnique({
@@ -49,6 +59,7 @@ export class ClinicsService {
   }
 
   async create(dto: CreateClinicDto): Promise<ClinicResponseDto> {
+    if (dto.timezone !== undefined) this.validateTimezone(dto.timezone);
     const code = await this.generateClinicCode();
     const clinic = await this.prisma.$transaction(async (tx) => {
       const createdClinic = await tx.clinic.create({
@@ -184,6 +195,7 @@ export class ClinicsService {
 
   async update(id: string, dto: UpdateClinicDto): Promise<ClinicResponseDto> {
     await this.findById(id);
+    if (dto.timezone !== undefined) this.validateTimezone(dto.timezone);
 
     if (dto.email) {
       const existing = await this.prisma.clinic.findFirst({

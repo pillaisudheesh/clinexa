@@ -17,9 +17,27 @@ import { seedLabTests } from './seeds/lab-test.seed';
 const prisma = new PrismaClient();
 
 async function main() {
+  const platformAdminEmail = process.env.PLATFORM_ADMIN_EMAIL?.trim();
+  const platformAdminPassword = process.env.PLATFORM_ADMIN_PASSWORD;
+
+  if (
+    !platformAdminEmail ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(platformAdminEmail)
+  ) {
+    throw new Error(
+      'Set PLATFORM_ADMIN_EMAIL to the email address for the initial platform administrator before seeding.',
+    );
+  }
+
+  if (!platformAdminPassword || platformAdminPassword.length < 16) {
+    throw new Error(
+      'Set PLATFORM_ADMIN_PASSWORD to a unique password of at least 16 characters before seeding.',
+    );
+  }
+
   console.log('🌱 Seeding database...\n');
 
-  const clinic = await seedClinic(prisma);
+  const clinic = await seedClinic(prisma, platformAdminEmail);
 
   await seedPermissionGroups(prisma);
 
@@ -32,7 +50,13 @@ async function main() {
     assignDefaultRolePermissions(tx, clinic.id),
   );
 
-  await seedUsers(prisma, clinic.id, roles);
+  await seedUsers(
+    prisma,
+    clinic.id,
+    roles,
+    platformAdminEmail,
+    platformAdminPassword,
+  );
 
   await seedDepartments(clinic.id);
   await seedSpecialties(clinic.id);

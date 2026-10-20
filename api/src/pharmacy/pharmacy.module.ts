@@ -6,8 +6,11 @@ import { DispensingController } from './dispensing.controller';
 import { DispensingService } from './dispensing.service';
 import { PharmacyPrescriptionController } from './pharmacy-prescription.controller';
 import { PharmacyPrescriptionService } from './pharmacy-prescription.service';
+import { PrismaModule } from '../prisma/prisma.module';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
+  imports: [PrismaModule, AuditModule],
   controllers: [
     PharmacyController,
     DispensingController,

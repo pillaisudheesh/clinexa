@@ -109,7 +109,7 @@ export class MedicinesService {
       const existing = await tx.medicine.findFirst({ where: { id, clinicId } });
       if (!existing) throw new NotFoundException('Medicine not found');
       const updated = await tx.medicine.update({
-        where: { id },
+        where: { id, clinicId },
         data: {
           ...(dto.name !== undefined && { name: dto.name }),
           ...(dto.genericName !== undefined && {
@@ -152,7 +152,7 @@ export class MedicinesService {
       const existing = await tx.medicine.findFirst({ where: { id, clinicId } });
       if (!existing) throw new NotFoundException('Medicine not found');
       if (!existing.isActive) return;
-      await tx.medicine.update({ where: { id }, data: { isActive: false } });
+      await tx.medicine.update({ where: { id, clinicId }, data: { isActive: false } });
       await this.auditService.createInTransaction(tx, {
         clinicId,
         actorId,

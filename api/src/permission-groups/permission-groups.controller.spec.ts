@@ -1,18 +1,13 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { PlatformAdminGuard } from '../auth/guards/platform-admin.guard';
 import { PermissionGroupsController } from './permission-groups.controller';
 
 describe('PermissionGroupsController', () => {
-  let controller: PermissionGroupsController;
+  it('requires the database-backed PlatformAdminGuard', () => {
+    const guards = Reflect.getMetadata(
+      '__guards__',
+      PermissionGroupsController,
+    ) as unknown[];
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      controllers: [PermissionGroupsController],
-    }).compile();
-
-    controller = module.get<PermissionGroupsController>(PermissionGroupsController);
-  });
-
-  it('should be defined', () => {
-    expect(controller).toBeDefined();
+    expect(guards).toContain(PlatformAdminGuard);
   });
 });

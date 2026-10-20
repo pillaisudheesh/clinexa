@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { ConfigService } from '@nestjs/config';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
@@ -9,6 +10,7 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
   app.use(helmet());
   // Clinic logos are non-sensitive brand assets; serve only the dedicated logo directory.
   app.use(
@@ -21,8 +23,9 @@ async function bootstrap() {
   );
 
   app.setGlobalPrefix('api/v1');
+  const corsOrigins = configService.getOrThrow<string[]>('app.corsOrigins');
   app.enableCors({
-    origin: ['http://localhost:3001'],
+    origin: corsOrigins,
     credentials: true,
   });
 
@@ -37,21 +40,28 @@ async function bootstrap() {
     }),
   );
 
-  const config = new DocumentBuilder()
-    .setTitle('SamaRoot API')
-    .setDescription('SamaRoot Clinic Management Platform')
-    .setVersion('1.0.0')
-    .addBearerAuth()
-    .build();
+  const swaggerEnabled = configService.getOrThrow<boolean>(
+    'app.swaggerEnabled',
+  );
+  if (swaggerEnabled) {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('SamaRoot API')
+      .setDescription('SamaRoot Clinic Management Platform')
+      .setVersion('1.0.0')
+      .addBearerAuth()
+      .build();
 
-  const document = SwaggerModule.createDocument(app, config);
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('docs', app, document);
+  }
 
-  SwaggerModule.setup('docs', app, document);
+  const port = configService.getOrThrow<number>('app.port');
+  await app.listen(port);
 
-  await app.listen(3000);
-
-  console.log(`🚀 Server running at http://localhost:3000`);
-  console.log(`📘 Swagger: http://localhost:3000/docs`);
+  console.log(`🚀 Server running on port ${port}`);
+  if (swaggerEnabled) {
+    console.log(`📘 Swagger: /docs`);
+  }
 }
 
 bootstrap().catch((err) => {
