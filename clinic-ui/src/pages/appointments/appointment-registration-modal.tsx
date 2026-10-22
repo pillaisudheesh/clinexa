@@ -30,7 +30,7 @@ interface AppointmentRegistrationModalProps {
   doctors: Doctor[];
 
   onClose: () => void;
-
+  initialDate?: string;
   onCreated: () => Promise<void> | void;
 }
 
@@ -125,6 +125,7 @@ export function AppointmentRegistrationModal({
   patients,
   doctors,
   onClose,
+  initialDate,
   onCreated,
 }: AppointmentRegistrationModalProps) {
   const [form, setForm] = useState<FormState>(initialForm);
@@ -221,7 +222,7 @@ export function AppointmentRegistrationModal({
 
     setForm({
       ...initialForm,
-      appointmentDate: getInitialDate(),
+      appointmentDate: initialDate || getInitialDate(),
     });
 
     setPatientSearch("");
@@ -237,7 +238,7 @@ export function AppointmentRegistrationModal({
     setSlotError(null);
     setError(null);
     setSaving(false);
-  }, [open]);
+  }, [open, initialDate]);
 
   /*
    * Close patient / doctor dropdowns when clicking

@@ -4,6 +4,8 @@ import {
   ChevronDown,
   FileText,
   Loader2,
+  History,
+  Printer,
   Save,
   Stethoscope,
 } from "lucide-react";
@@ -14,6 +16,11 @@ import { appointmentService } from "@/services/appointment-service";
 import { diagnosisService } from "@/services/diagnosis-service";
 import { medicalRecordService } from "@/services/medical-record-service";
 import { prescriptionService } from "@/services/prescription-service";
+import {
+  clinicSettingsService,
+  type ClinicBranding,
+} from "@/services/clinic-settings-service";
+import { ClinicLogo } from "@/components/clinic-logo";
 import { useAuth } from "@/auth/auth-context";
 
 import type { Appointment } from "@/types/appointment";
@@ -35,6 +42,7 @@ import type {
 
 import { DiagnosisSection } from "@/pages/appointments/diagnosis-section";
 import { PrescriptionSection } from "./prescription-section";
+import "./consultation-print.css";
 
 type ConsultationTab =
   | "consultation"
@@ -48,10 +56,16 @@ export function ConsultationPage() {
   const { hasPermission } = useAuth();
 
   const [appointment, setAppointment] = useState<Appointment | null>(null);
+  const [clinicBranding, setClinicBranding] = useState<ClinicBranding | null>(
+    null,
+  );
   const [medicalRecord, setMedicalRecord] = useState<MedicalRecord | null>(
     null,
   );
   const [diagnoses, setDiagnoses] = useState<Diagnosis[]>([]);
+  const [historyRecords, setHistoryRecords] = useState<MedicalRecord[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState(false);
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [prescriptionsLoading, setPrescriptionsLoading] = useState(false);
   const [prescriptionSaving, setPrescriptionSaving] = useState(false);
@@ -78,6 +92,21 @@ export function ConsultationPage() {
   const [assessment, setAssessment] = useState("");
   const [treatmentPlan, setTreatmentPlan] = useState("");
   const [followUpInstructions, setFollowUpInstructions] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    clinicSettingsService
+      .getBranding()
+      .then((response) => {
+        if (!cancelled) setClinicBranding(response.data);
+      })
+      .catch((error) =>
+        console.error("Unable to load clinic branding for print view.", error),
+      );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const canReadPrescriptions = hasPermission("PRESCRIPTION_READ");
   const canCreatePrescriptions = hasPermission("PRESCRIPTION_CREATE");
@@ -219,6 +248,54 @@ export function ConsultationPage() {
       document.removeEventListener("pointerdown", handlePointerDown);
     };
   }, [sectionMenuOpen]);
+
+  useEffect(() => {
+    if (
+      activeTab !== "history" ||
+      !appointment?.patientId ||
+      !canReadMedicalRecords
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    const loadPatientHistory = async () => {
+      setHistoryLoading(true);
+      setHistoryError(false);
+      try {
+        const response = await medicalRecordService.getMedicalRecords(
+          undefined,
+          appointment.patientId,
+          1,
+          100,
+        );
+        if (!cancelled) {
+          // Keep this visit out of the previous-history list.
+          setHistoryRecords(
+            response.data.filter((record) => record.id !== medicalRecord?.id),
+          );
+        }
+      } catch (error) {
+        console.error("Unable to load patient consultation history.", error);
+        if (!cancelled) {
+          setHistoryError(true);
+          setHistoryRecords([]);
+        }
+      } finally {
+        if (!cancelled) setHistoryLoading(false);
+      }
+    };
+
+    void loadPatientHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeTab,
+    appointment?.patientId,
+    canReadMedicalRecords,
+    medicalRecord?.id,
+  ]);
 
   useEffect(() => {
     setChiefComplaint(medicalRecord?.chiefComplaint ?? "");
@@ -457,8 +534,8 @@ export function ConsultationPage() {
   ];
 
   return (
-    <div className="min-h-full bg-slate-50/60 p-4 pb-32 sm:p-6 sm:pb-6">
-      <div className="mx-auto max-w-6xl">
+    <div className="consultation-page-root min-h-full bg-slate-50/60 p-4 pb-32 sm:p-6 sm:pb-6">
+      <div className="consultation-screen-content mx-auto max-w-6xl">
         <button
           type="button"
           onClick={() => navigate("/appointments")}
@@ -493,6 +570,20 @@ export function ConsultationPage() {
               <span className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">
                 {appointment.status.replaceAll("_", " ")}
               </span>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                disabled={!recordExists}
+                title={
+                  !recordExists
+                    ? "Save the consultation before printing"
+                    : "Print consultation and prescription"
+                }
+                className="print-hidden inline-flex min-h-10 items-center justify-center gap-2 rounded-xl !border !border-teal-600 !bg-teal-600 px-4 py-2 text-sm font-semibold !text-white shadow-sm transition-colors hover:!border-teal-700 hover:!bg-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Printer size={15} />
+                Print consultation
+              </button>
               {readOnly && (
                 <span className="rounded-lg bg-teal-50 px-2.5 py-1.5 text-[10px] font-semibold text-teal-700 ring-1 ring-inset ring-teal-100">
                   Read only
@@ -727,10 +818,149 @@ export function ConsultationPage() {
           )}
 
           {activeTab === "history" && (
-            <EmptySection
-              title="Consultation History"
-              message="Previous consultation history will be displayed here."
-            />
+            <div className="p-5 sm:p-6">
+              <div className="mb-5 flex items-start gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
+                  <History size={18} />
+                </div>
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-800">
+                    Previous consultations
+                  </h2>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    Clinical records for {patientName}, newest first. The
+                    current visit is excluded.
+                  </p>
+                </div>
+              </div>
+
+              {!canReadMedicalRecords ? (
+                <EmptySection
+                  title="History unavailable"
+                  message="You do not have permission to view medical records."
+                />
+              ) : historyLoading ? (
+                <div className="flex min-h-40 items-center justify-center gap-2 text-sm text-slate-400">
+                  <Loader2 size={17} className="animate-spin" /> Loading patient
+                  history...
+                </div>
+              ) : historyError ? (
+                <div className="rounded-xl border border-rose-100 bg-rose-50/60 p-4 text-sm text-rose-700">
+                  Could not load consultation history. Please try opening the
+                  History tab again.
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("consultation")}
+                    className="ml-2 font-semibold underline"
+                  >
+                    Return to consultation
+                  </button>
+                </div>
+              ) : historyRecords.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center">
+                  <FileText size={22} className="mx-auto text-slate-300" />
+                  <p className="mt-3 text-sm font-medium text-slate-600">
+                    No previous consultations
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Earlier medical records for this patient will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {historyRecords.map((record) => {
+                    const recordDate = new Date(record.createdAt);
+                    const dateLabel = Number.isNaN(recordDate.getTime())
+                      ? "Date unavailable"
+                      : recordDate.toLocaleString(undefined, {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        });
+                    const summary =
+                      record.chiefComplaint ||
+                      record.historyOfPresentIllness ||
+                      record.assessment;
+                    return (
+                      <article
+                        key={record.id}
+                        className="consultation-history-card rounded-xl border bg-white p-4 transition"
+                      >
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="text-xs font-medium text-teal-700">
+                              {dateLabel}
+                            </p>
+                            <h3 className="mt-1 text-sm font-semibold text-slate-800">
+                              {record.chiefComplaint || "Consultation"}
+                            </h3>
+                          </div>
+                          <span className="w-fit rounded-lg bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                            Previous visit
+                          </span>
+                        </div>
+                        {summary && (
+                          <p className="mt-3 text-sm leading-6 text-slate-600">
+                            {summary}
+                          </p>
+                        )}
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                          {record.historyOfPresentIllness && (
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                History
+                              </p>
+                              <p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-slate-600">
+                                {record.historyOfPresentIllness}
+                              </p>
+                            </div>
+                          )}
+                          {record.examinationNotes && (
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                Examination
+                              </p>
+                              <p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-slate-600">
+                                {record.examinationNotes}
+                              </p>
+                            </div>
+                          )}
+                          {record.assessment && (
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                Assessment
+                              </p>
+                              <p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-slate-600">
+                                {record.assessment}
+                              </p>
+                            </div>
+                          )}
+                          {record.treatmentPlan && (
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                Treatment plan
+                              </p>
+                              <p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-slate-600">
+                                {record.treatmentPlan}
+                              </p>
+                            </div>
+                          )}
+                          {record.followUpInstructions && (
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                Follow-up
+                              </p>
+                              <p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-slate-600">
+                                {record.followUpInstructions}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           )}
         </section>
 
@@ -784,8 +1014,209 @@ export function ConsultationPage() {
           </div>
         </div>
       </div>
+
+      <article
+        className="print-consultation-document"
+        aria-label="Printable consultation"
+      >
+        <header
+          className="print-clinic-header"
+          style={{ borderColor: clinicBranding?.brandColor || "#0f766e" }}
+        >
+          <div className="print-clinic-identity">
+            <ClinicLogo
+              logoUrl={clinicBranding?.logoUrl}
+              clinicName={clinicBranding?.name}
+              className="print-clinic-logo"
+              fallbackClassName="print-clinic-logo-fallback"
+            />
+            <div>
+              <h1 style={{ color: clinicBranding?.brandColor || "#0f766e" }}>
+                {clinicBranding?.name || "Clinic"}
+              </h1>
+              {clinicBranding?.tagline && <p>{clinicBranding.tagline}</p>}
+            </div>
+          </div>
+          <div className="print-document-title">
+            <h2>Consultation Summary</h2>
+            <p>
+              {new Date(appointment.appointmentDate).toLocaleDateString(
+                undefined,
+                { year: "numeric", month: "long", day: "numeric" },
+              )}
+            </p>
+          </div>
+        </header>
+
+        <section className="print-patient-grid">
+          <div>
+            <span>Patient</span>
+            <strong>{patientName}</strong>
+          </div>
+          <div>
+            <span>Patient ID</span>
+            <strong>{appointment.patient?.patientNumber || "—"}</strong>
+          </div>
+          <div>
+            <span>Age / Gender</span>
+            <strong>
+              {formatPatientAge(appointment.patient?.dateOfBirth)}
+              {appointment.patient?.gender
+                ? ` / ${appointment.patient.gender}`
+                : ""}
+            </strong>
+          </div>
+          <div>
+            <span>Visit date &amp; time</span>
+            <strong>
+              {formatVisitDateTime(
+                appointment.appointmentDate,
+                appointment.startTime,
+              )}
+            </strong>
+          </div>
+          <div>
+            <span>Doctor</span>
+            <strong>{doctorName}</strong>
+          </div>
+          <div>
+            <span>Appointment</span>
+            <strong>{appointment.appointmentNumber}</strong>
+          </div>
+        </section>
+
+        <section className="print-clinical-section">
+          <h3>Clinical Notes</h3>
+          {[
+            ["Chief complaint", chiefComplaint],
+            ["History of present illness", historyOfPresentIllness],
+            ["Examination", examinationNotes],
+            ["Assessment", assessment],
+            ["Treatment plan", treatmentPlan],
+            ["Follow-up", followUpInstructions],
+          ].map(([label, value]) =>
+            value?.trim() ? (
+              <div className="print-note-row" key={label as string}>
+                <h4>{label}</h4>
+                <p>{value}</p>
+              </div>
+            ) : null,
+          )}
+          {!chiefComplaint.trim() &&
+            !historyOfPresentIllness.trim() &&
+            !examinationNotes.trim() &&
+            !assessment.trim() &&
+            !treatmentPlan.trim() &&
+            !followUpInstructions.trim() && (
+              <p className="print-muted">No clinical notes recorded.</p>
+            )}
+        </section>
+
+        <section className="print-clinical-section">
+          <h3>Diagnosis</h3>
+          {diagnoses.length ? (
+            <ul className="print-diagnosis-list">
+              {diagnoses.map((diagnosis) => (
+                <li key={diagnosis.id}>
+                  <strong>{diagnosis.name}</strong>
+                  {diagnosis.code ? ` (${diagnosis.code})` : ""}
+                  {diagnosis.isPrimary ? " — Primary" : ""}
+                  {diagnosis.notes ? <p>{diagnosis.notes}</p> : null}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="print-muted">No diagnosis recorded.</p>
+          )}
+        </section>
+
+        <section className="print-clinical-section">
+          <h3>Prescription (Rx)</h3>
+          {prescriptions.length ? (
+            <table className="print-prescription-table">
+              <thead>
+                <tr>
+                  <th>Medicine</th>
+                  <th>Dosage</th>
+                  <th>Regimen / frequency</th>
+                  <th>Route</th>
+                  <th>Duration</th>
+                  <th>Qty</th>
+                </tr>
+              </thead>
+              <tbody>
+                {prescriptions.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      <strong>{item.medicationName}</strong>
+                    </td>
+                    <td>{item.dosage || "—"}</td>
+                    <td>
+                      <strong>{item.frequency || "—"}</strong>
+                      {item.instructions ? (
+                        <small>{item.instructions}</small>
+                      ) : null}
+                    </td>
+                    <td>{item.route || "—"}</td>
+                    <td>{item.duration || "—"}</td>
+                    <td>{item.quantity || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="print-muted">
+              No prescription recorded for this consultation.
+            </p>
+          )}
+        </section>
+
+        <footer className="print-document-footer">
+          <div>
+            <span>Doctor's signature</span>
+            <div className="print-signature-line" />
+            <strong>{doctorName}</strong>
+          </div>
+          <p>
+            Generated from the clinic record. Please contact the clinic if you
+            have questions about this consultation.
+          </p>
+        </footer>
+      </article>
     </div>
   );
+}
+
+function formatPatientAge(dateOfBirth?: string | null): string {
+  if (!dateOfBirth) return "Age not recorded";
+  const dob = new Date(dateOfBirth);
+  if (Number.isNaN(dob.getTime())) return "Age not recorded";
+  const today = new Date();
+  let years = today.getFullYear() - dob.getFullYear();
+  let months = today.getMonth() - dob.getMonth();
+  if (today.getDate() < dob.getDate()) months -= 1;
+  if (months < 0) {
+    years -= 1;
+    months += 12;
+  }
+  if (years < 0) return "Age not recorded";
+  if (years < 2) return `${years * 12 + months} months`;
+  return `${years} years`;
+}
+
+function formatVisitDateTime(date: string, time?: string): string {
+  const datePart = new Date(date);
+  if (Number.isNaN(datePart.getTime())) return "—";
+  const dateLabel = datePart.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+  if (!time) return dateLabel;
+  const [hours, minutes] = time.split(":");
+  const timePart = new Date(datePart);
+  if (hours && minutes) timePart.setHours(Number(hours), Number(minutes), 0, 0);
+  return `${dateLabel}, ${timePart.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
 }
 
 interface FieldProps {

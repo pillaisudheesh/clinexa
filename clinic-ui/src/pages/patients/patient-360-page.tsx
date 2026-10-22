@@ -157,6 +157,7 @@ export function Patient360Page() {
           limit: 10,
         }),
         pharmacyService.getPrescriptions({
+          patientId: id,
           page: 1,
           limit: 50,
         }),
@@ -206,11 +207,6 @@ export function Patient360Page() {
         }),
       );
 
-      const patientPharmacyPrescriptions =
-        pharmacyPrescriptionResult.data.filter(
-          (prescription) => prescription.patient.id === id,
-        );
-
       setPatient(patientResult);
       setAppointments(appointmentItems);
       setLabOrders(labOrderResult.data);
@@ -218,7 +214,7 @@ export function Patient360Page() {
       setMedicalRecords(medicalRecordsResult);
       setDiagnoses(diagnosisItems);
       setPrescriptions(prescriptionResults.flat());
-      setPharmacyPrescriptions(patientPharmacyPrescriptions);
+      setPharmacyPrescriptions(pharmacyPrescriptionResult.data);
     } catch (requestError) {
       console.error("Unable to load patient 360.", requestError);
       setError("Unable to load patient information.");

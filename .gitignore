@@ -141,3 +141,7 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+clinic-ui/.DS_Store
+.gitignore
+.DS_Store
+.DS_Store

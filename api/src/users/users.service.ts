@@ -24,6 +24,7 @@ type UserWithRoles = Prisma.UserGetPayload<{
         role: true;
       };
     };
+    doctorProfile: true;
   };
 }>;
 
@@ -57,6 +58,7 @@ export class UsersService {
     requester: AuthenticatedUser,
   ): Promise<UserResponseDto> {
     const isPlatformAdmin = this.isPlatformAdministrator(requester);
+
     if (!isPlatformAdmin && dto.clinicId !== requester.clinicId) {
       throw new ForbiddenException(
         'You can only create users for your own clinic.',
@@ -74,14 +76,17 @@ export class UsersService {
     }
 
     const roles = await this.findRoles(dto.roleIds);
+
     if (roles.length !== dto.roleIds.length) {
       throw new NotFoundException('One or more roles were not found.');
     }
+
     if (roles.some((role) => role.clinicId !== dto.clinicId)) {
       throw new ForbiddenException(
         'All assigned roles must belong to the selected clinic.',
       );
     }
+
     if (
       !isPlatformAdmin &&
       roles.some((role) => this.isSuperAdminRoleCode(role.code))
@@ -89,6 +94,34 @@ export class UsersService {
       throw new ForbiddenException(
         'Clinic administrators cannot assign the Super Administrator role.',
       );
+    }
+
+    // Validate the requested doctor association before creating the account.
+    if (dto.doctorId) {
+      const doctor = await this.prisma.doctor.findUnique({
+        where: { id: dto.doctorId },
+        select: {
+          id: true,
+          clinicId: true,
+          userId: true,
+        },
+      });
+
+      if (!doctor) {
+        throw new NotFoundException('Doctor profile not found.');
+      }
+
+      if (doctor.clinicId !== dto.clinicId) {
+        throw new ForbiddenException(
+          'The doctor profile must belong to the selected clinic.',
+        );
+      }
+
+      if (doctor.userId) {
+        throw new ConflictException(
+          'This doctor profile is already linked to a user account.',
+        );
+      }
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
@@ -106,8 +139,31 @@ export class UsersService {
 
       if (dto.roleIds.length > 0) {
         await tx.userRole.createMany({
-          data: dto.roleIds.map((roleId) => ({ userId: user.id, roleId })),
+          data: dto.roleIds.map((roleId) => ({
+            userId: user.id,
+            roleId,
+          })),
         });
+      }
+
+      if (dto.doctorId) {
+        // Recheck ownership and unlinked status atomically.
+        const linked = await tx.doctor.updateMany({
+          where: {
+            id: dto.doctorId,
+            clinicId: dto.clinicId,
+            userId: null,
+          },
+          data: {
+            userId: user.id,
+          },
+        });
+
+        if (linked.count !== 1) {
+          throw new ConflictException(
+            'The doctor profile was linked or changed. Please retry.',
+          );
+        }
       }
 
       await this.auditService.createInTransaction(tx, {
@@ -120,12 +176,18 @@ export class UsersService {
         metadata: {
           email: user.email,
           roleIds: dto.roleIds,
+          ...(dto.doctorId ? { doctorId: dto.doctorId } : {}),
         },
       });
 
       return tx.user.findUniqueOrThrow({
         where: { id: user.id },
-        include: { roles: { include: { role: true } } },
+        include: {
+          roles: {
+            include: { role: true },
+          },
+          doctorProfile: true,
+        },
       });
     });
 
@@ -167,7 +229,10 @@ export class UsersService {
     const [users, total] = await this.prisma.$transaction([
       this.prisma.user.findMany({
         where,
-        include: { roles: { include: { role: true } } },
+        include: {
+          roles: { include: { role: true } },
+          doctorProfile: true,
+        },
         skip,
         take: limit,
         orderBy: { [sortBy]: sortOrder },
@@ -191,7 +256,7 @@ export class UsersService {
   async findById(id: string): Promise<UserWithRoles | null> {
     return this.prisma.user.findUnique({
       where: { id },
-      include: { roles: { include: { role: true } } },
+      include: { roles: { include: { role: true } }, doctorProfile: true },
     });
   }
 
@@ -308,7 +373,7 @@ export class UsersService {
 
       const user = await tx.user.findUniqueOrThrow({
         where: { id },
-        include: { roles: { include: { role: true } } },
+        include: { roles: { include: { role: true } }, doctorProfile: true },
       });
 
       const changedFields = (
@@ -391,7 +456,7 @@ export class UsersService {
       }
       const user = await tx.user.findUniqueOrThrow({
         where: { id },
-        include: { roles: { include: { role: true } } },
+        include: { roles: { include: { role: true } }, doctorProfile: true },
       });
 
       const action =
@@ -417,5 +482,47 @@ export class UsersService {
     });
 
     return UserMapper.toResponseDto(updatedUser);
+  }
+
+  async getAvailableDoctors(clinicId: string, requester: AuthenticatedUser) {
+    const isPlatformAdmin = this.isPlatformAdministrator(requester);
+
+    if (!isPlatformAdmin && clinicId !== requester.clinicId) {
+      throw new ForbiddenException(
+        'You can only access doctor profiles from your own clinic.',
+      );
+    }
+
+    const clinic = await this.prisma.clinic.findUnique({
+      where: { id: clinicId },
+      select: { id: true },
+    });
+
+    if (!clinic) {
+      throw new NotFoundException('Clinic not found.');
+    }
+
+    return this.prisma.doctor.findMany({
+      where: {
+        clinicId,
+        isActive: true,
+        userId: null,
+      },
+      select: {
+        id: true,
+        doctorNumber: true,
+        title: true,
+        firstName: true,
+        middleName: true,
+        lastName: true,
+        department: {
+          select: { name: true },
+        },
+        primarySpecialty: {
+          select: { name: true },
+        },
+      },
+      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+    });
   }
 }

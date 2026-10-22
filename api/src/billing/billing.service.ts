@@ -11,10 +11,10 @@ import {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateInvoiceDto } from './dto/create-invoice.dto';
-import { UpdateInvoiceDto } from './dto/update-invoice.dto';
+import { CreateBillingInvoiceDto } from './dto/create-invoice.dto';
+import { UpdateBillingInvoiceDto } from './dto/update-invoice.dto';
 import { InvoiceQueryDto } from './dto/invoice-query.dto';
-import { CreatePaymentDto } from './dto/create-payment.dto';
+import { CreateBillingPaymentDto } from './dto/create-payment.dto';
 
 const ZERO = new Prisma.Decimal('0.00');
 
@@ -22,7 +22,7 @@ const ZERO = new Prisma.Decimal('0.00');
 export class BillingService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(clinicId: string, dto: CreateInvoiceDto) {
+  async create(clinicId: string, dto: CreateBillingInvoiceDto) {
     const patient = await this.prisma.patient.findFirst({
       where: { id: dto.patientId, clinicId, isActive: true },
       select: { id: true },
@@ -66,6 +66,22 @@ export class BillingService {
       ),
     ];
 
+    // A source item may be invoiced only once. Reject duplicates explicitly
+    // instead of relying on the database's unique constraint to fail later.
+    if (labIds.length !== itemLinks.filter((x) => x.labOrderItemId).length) {
+      throw new BadRequestException(
+        'A laboratory item can only be invoiced once',
+      );
+    }
+    if (
+      dispensingItemIds.length !==
+      itemLinks.filter((x) => x.pharmacyDispensingItemId).length
+    ) {
+      throw new BadRequestException(
+        'A pharmacy dispensing item can only be invoiced once',
+      );
+    }
+
     if (labIds.length) {
       const validLabItems = await this.prisma.labOrderItem.findMany({
         where: {
@@ -88,12 +104,23 @@ export class BillingService {
     if (dispensingItemIds.length) {
       const validDispensingItems =
         await this.prisma.pharmacyDispensingItem.findMany({
-          where: { id: { in: dispensingItemIds }, dispensing: { clinicId } },
+          where: {
+            id: { in: dispensingItemIds },
+            dispensing: {
+              clinicId,
+              prescription: {
+                medicalRecord: {
+                  patientId: dto.patientId,
+                  appointmentId: dto.appointmentId,
+                },
+              },
+            },
+          },
           select: { id: true },
         });
       if (validDispensingItems.length !== dispensingItemIds.length) {
         throw new BadRequestException(
-          'One or more pharmacy dispensing items do not belong to this clinic',
+          'One or more pharmacy dispensing items do not belong to this clinic, patient, and appointment',
         );
       }
     }
@@ -191,7 +218,11 @@ export class BillingService {
     );
   }
 
-  async update(clinicId: string, invoiceId: string, dto: UpdateInvoiceDto) {
+  async update(
+    clinicId: string,
+    invoiceId: string,
+    dto: UpdateBillingInvoiceDto,
+  ) {
     return this.prisma.$transaction(
       async (tx) => {
         const invoice = await tx.invoice.findFirst({
@@ -345,7 +376,7 @@ export class BillingService {
   async createPayment(
     clinicId: string,
     invoiceId: string,
-    dto: CreatePaymentDto,
+    dto: CreateBillingPaymentDto,
   ) {
     const amount = new Prisma.Decimal(dto.amount).toDecimalPlaces(2);
     if (!amount.greaterThan(0))

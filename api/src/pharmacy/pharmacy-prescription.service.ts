@@ -1,11 +1,8 @@
 import { Injectable } from '@nestjs/common';
-
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
-
 import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
-
 import { PharmacyPrescriptionQueryDto } from './dto/pharmacy-prescription-query.dto';
 import {
   PharmacyDispensingSummaryDto,
@@ -22,14 +19,16 @@ export class PharmacyPrescriptionService {
     clinicId: string,
     query: PharmacyPrescriptionQueryDto,
   ): Promise<PaginatedResponseDto<PharmacyPrescriptionResponseDto>> {
-    const { page = 1, limit = 10, search, status } = query;
+    const { page = 1, limit = 10, search, status, patientId } = query;
 
     const skip = (page - 1) * limit;
+    const trimmedSearch = search?.trim();
 
     const where: Prisma.PrescriptionWhereInput = {
       medicalRecord: {
         patient: {
           clinicId,
+          ...(patientId ? { id: patientId } : {}),
         },
       },
 
@@ -44,30 +43,30 @@ export class PharmacyPrescriptionService {
         ? { dispensing: { is: { status: 'CANCELLED' } } }
         : {}),
 
-      ...(search?.trim() && {
+      ...(trimmedSearch && {
         OR: [
           {
             medicationName: {
-              contains: search.trim(),
+              contains: trimmedSearch,
               mode: 'insensitive',
             },
           },
           {
             dosage: {
-              contains: search.trim(),
+              contains: trimmedSearch,
               mode: 'insensitive',
             },
           },
           {
             instructions: {
-              contains: search.trim(),
+              contains: trimmedSearch,
               mode: 'insensitive',
             },
           },
           {
             medicine: {
               name: {
-                contains: search.trim(),
+                contains: trimmedSearch,
                 mode: 'insensitive',
               },
             },
@@ -77,20 +76,14 @@ export class PharmacyPrescriptionService {
               patient: {
                 OR: [
                   {
-                    firstName: {
-                      contains: search.trim(),
-                      mode: 'insensitive',
-                    },
+                    firstName: { contains: trimmedSearch, mode: 'insensitive' },
                   },
                   {
-                    lastName: {
-                      contains: search.trim(),
-                      mode: 'insensitive',
-                    },
+                    lastName: { contains: trimmedSearch, mode: 'insensitive' },
                   },
                   {
                     patientNumber: {
-                      contains: search.trim(),
+                      contains: trimmedSearch,
                       mode: 'insensitive',
                     },
                   },
@@ -103,20 +96,14 @@ export class PharmacyPrescriptionService {
               doctor: {
                 OR: [
                   {
-                    firstName: {
-                      contains: search.trim(),
-                      mode: 'insensitive',
-                    },
+                    firstName: { contains: trimmedSearch, mode: 'insensitive' },
                   },
                   {
-                    lastName: {
-                      contains: search.trim(),
-                      mode: 'insensitive',
-                    },
+                    lastName: { contains: trimmedSearch, mode: 'insensitive' },
                   },
                   {
                     doctorNumber: {
-                      contains: search.trim(),
+                      contains: trimmedSearch,
                       mode: 'insensitive',
                     },
                   },
@@ -133,40 +120,27 @@ export class PharmacyPrescriptionService {
         where,
         skip,
         take: limit,
-
-        orderBy: {
-          createdAt: 'desc',
-        },
-
+        orderBy: { createdAt: 'desc' },
         include: {
           medicine: true,
-
           medicalRecord: {
             include: {
               patient: true,
               doctor: true,
             },
           },
-
           dispensing: {
-            select: {
-              id: true,
-              status: true,
-            },
+            select: { id: true, status: true },
           },
         },
       }),
-
-      this.prisma.prescription.count({
-        where,
-      }),
+      this.prisma.prescription.count({ where }),
     ]);
 
     return {
       data: prescriptions.map((prescription) =>
         this.mapPrescription(prescription),
       ),
-
       total,
       page,
       limit,
@@ -221,7 +195,6 @@ export class PharmacyPrescriptionService {
       prescriptionNumber: prescription.prescriptionNumber,
       medicalRecordId: prescription.medicalRecordId,
       medicineId: prescription.medicineId,
-
       medicationName: prescription.medicationName,
       dosage: prescription.dosage,
       frequency: prescription.frequency,
@@ -229,9 +202,7 @@ export class PharmacyPrescriptionService {
       duration: prescription.duration,
       quantity: prescription.quantity,
       instructions: prescription.instructions,
-
       createdAt: prescription.createdAt,
-
       patient,
       doctor,
       dispensing,

@@ -198,4 +198,28 @@ export class UsersController {
   ): Promise<UserResponseDto> {
     return this.usersService.updateStatus(id, dto, user);
   }
+
+  // ===========================================================================
+  // AVAILABLE DOCTOR PROFILES
+  // ===========================================================================
+
+  @Get('available-doctors')
+  @Permissions(PermissionCodes.USER_CREATE)
+  @ApiOperation({
+    summary: 'Get available doctor profiles for linking to user accounts',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Available doctor profiles retrieved successfully.',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Insufficient permissions or clinic access.',
+  })
+  getAvailableDoctors(
+    @Query('clinicId', ParseUUIDPipe) clinicId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.usersService.getAvailableDoctors(clinicId, user);
+  }
 }

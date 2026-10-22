@@ -13,24 +13,28 @@ import {
 export class CreateUserDto {
   @IsString()
   @IsNotEmpty()
-  firstName: string;
+  firstName!: string;
 
   @IsOptional()
   @IsString()
   lastName?: string;
 
   @IsEmail()
-  email: string;
+  email!: string;
 
   @MinLength(8)
-  password: string;
+  password!: string;
 
   @IsUUID()
-  clinicId: string;
+  clinicId!: string;
 
   @IsArray()
   @ArrayNotEmpty()
   @ArrayUnique()
   @IsUUID('4', { each: true })
-  roleIds: string[];
+  roleIds!: string[];
+
+  @IsOptional()
+  @IsUUID('4')
+  doctorId?: string;
 }

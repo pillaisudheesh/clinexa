@@ -1,4 +1,12 @@
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+  IsUUID,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class PharmacyPrescriptionQueryDto {
@@ -22,4 +30,7 @@ export class PharmacyPrescriptionQueryDto {
   @IsOptional()
   @IsIn(['PENDING', 'PARTIALLY_DISPENSED', 'DISPENSED', 'CANCELLED'])
   status?: 'PENDING' | 'PARTIALLY_DISPENSED' | 'DISPENSED' | 'CANCELLED';
+  @IsOptional()
+  @IsUUID()
+  patientId?: string;
 }

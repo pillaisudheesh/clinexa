@@ -502,6 +502,12 @@ export function DoctorsPage() {
       >
         <div>
           <div className="flex items-center gap-2">
+            <Stethoscope
+              size={22}
+              strokeWidth={1.8}
+              aria-hidden="true"
+              className="shrink-0 text-teal-600"
+            />
             <h1
               className="
                 text-2xl
@@ -716,8 +722,6 @@ export function DoctorsPage() {
               flex-wrap
               items-center
               gap-2
-              border-t
-              border-slate-100
               pt-4
             "
           >

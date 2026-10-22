@@ -21,6 +21,8 @@ export interface AppointmentPatient {
   firstName: string;
   middleName?: string;
   lastName: string;
+  dateOfBirth?: string | null;
+  gender?: string | null;
 }
 
 export interface AppointmentDoctor {

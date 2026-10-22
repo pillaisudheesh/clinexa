@@ -430,65 +430,59 @@ export class LabOrdersService {
     id: string,
     dto: UpdateLabOrderStatusDto,
   ): Promise<LabOrderResponseDto> {
-    const order = await this.prisma.labOrder.findFirst({
-      where: {
-        id,
-        clinicId,
-      },
+    const updatedOrder = await this.prisma.$transaction(async (tx) => {
+      const order = await tx.labOrder.findFirst({
+        where: { id, clinicId },
+        include: { labOrderItems: true },
+      });
 
-      include: {
-        labOrderItems: {
-          include: {
-            result: true,
-          },
-        },
-      },
-    });
+      if (!order) {
+        throw new NotFoundException('Laboratory order not found');
+      }
 
-    if (!order) {
-      throw new NotFoundException('Laboratory order not found');
-    }
+      this.validateStatusTransition(order.status, dto.status);
 
-    this.validateStatusTransition(order.status, dto.status);
+      if (dto.status === LabOrderStatus.COMPLETED) {
+        const incompleteItems = order.labOrderItems.some(
+          (item) =>
+            item.status !== LabOrderItemStatus.COMPLETED &&
+            item.status !== LabOrderItemStatus.CANCELLED,
+        );
 
-    // -------------------------------------------------------------------------
-    // An order can only be completed when all items
-    // are completed or cancelled.
-    // -------------------------------------------------------------------------
+        if (incompleteItems) {
+          throw new BadRequestException(
+            'All laboratory tests must be completed or cancelled before completing the order',
+          );
+        }
+      }
 
-    if (dto.status === LabOrderStatus.COMPLETED) {
-      const incompleteItems = order.labOrderItems.some(
-        (item) =>
-          item.status !== LabOrderItemStatus.COMPLETED &&
-          item.status !== LabOrderItemStatus.CANCELLED,
-      );
+      // Guard the write against a concurrent status change after the read.
+      const result = await tx.labOrder.updateMany({
+        where: { id, clinicId, status: order.status },
+        data: { status: dto.status },
+      });
 
-      if (incompleteItems) {
-        throw new BadRequestException(
-          'All laboratory tests must be completed or cancelled before completing the order',
+      if (result.count !== 1) {
+        throw new ConflictException(
+          'The laboratory order changed while being updated. Refresh and try again.',
         );
       }
-    }
 
-    const updatedOrder = await this.prisma.labOrder.update({
-      where: {
-        id,
-        clinicId,
-      },
-
-      data: {
-        status: dto.status,
-      },
-
-      include: {
-        ...appointmentInclude,
-        labOrderItems: {
-          include: {
-            labTest: true,
-            result: true,
+      const freshOrder = await tx.labOrder.findFirst({
+        where: { id, clinicId },
+        include: {
+          ...appointmentInclude,
+          labOrderItems: {
+            include: { labTest: true, result: true },
           },
         },
-      },
+      });
+
+      if (!freshOrder) {
+        throw new NotFoundException('Laboratory order not found');
+      }
+
+      return freshOrder;
     });
 
     return this.mapLabOrder(updatedOrder);
@@ -662,9 +656,18 @@ export class LabOrdersService {
     // Cannot modify cancelled order
     // -------------------------------------------------------------------------
 
-    if (item.labOrder.status === LabOrderStatus.CANCELLED) {
+    if (
+      item.labOrder.status === LabOrderStatus.CANCELLED ||
+      item.labOrder.status === LabOrderStatus.COMPLETED
+    ) {
       throw new BadRequestException(
-        'Cannot modify a cancelled laboratory order',
+        `Cannot modify items on a ${item.labOrder.status.toLowerCase()} laboratory order`,
+      );
+    }
+
+    if (item.status === LabOrderItemStatus.COMPLETED) {
+      throw new BadRequestException(
+        'Completed laboratory tests cannot change status',
       );
     }
 

@@ -10,6 +10,7 @@ import {
   Plus,
   Search,
   UserRound,
+  UsersRound,
   X,
 } from "lucide-react";
 
@@ -533,6 +534,12 @@ export function PatientsPage() {
       >
         <div>
           <div className="flex items-center gap-2">
+            <UsersRound
+              size={22}
+              strokeWidth={1.8}
+              aria-hidden="true"
+              className="shrink-0 text-teal-600"
+            />
             <h1
               className="
                 text-2xl
@@ -747,8 +754,6 @@ export function PatientsPage() {
               flex-wrap
               items-center
               gap-2
-              border-t
-              border-slate-100
               pt-4
             "
           >

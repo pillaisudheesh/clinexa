@@ -1,0 +1,242 @@
+/*
+ * Consultation-only print styles.
+ * Imported by consultation-page.tsx so the rules do not affect other pages.
+ */
+.print-consultation-document {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 10mm 11mm;
+  }
+
+  html,
+  body {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  /*
+   * Hide the regular UI and remove the consultation screen from print layout.
+   * The print article stays in normal document flow to reduce blank pages.
+   */
+  body * {
+    visibility: hidden !important;
+  }
+
+  .consultation-screen-content {
+    display: none !important;
+  }
+
+  .consultation-page-root .print-consultation-document,
+  .consultation-page-root .print-consultation-document * {
+    visibility: visible !important;
+  }
+
+  .consultation-page-root .print-consultation-document {
+    display: block !important;
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: #1e293b !important;
+    background: #fff !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-size: 9.5pt !important;
+    line-height: 1.35 !important;
+  }
+
+  .print-hidden {
+    display: none !important;
+  }
+
+  .print-clinic-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 18px;
+    padding: 0 0 9px;
+    border-bottom: 2px solid #0f766e;
+  }
+  .print-clinic-identity {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+  .print-clinic-logo {
+    width: 54px !important;
+    height: 54px !important;
+    object-fit: contain !important;
+  }
+  .print-clinic-logo-fallback {
+    display: flex;
+    width: 54px;
+    height: 54px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #e2e8f0;
+    color: #64748b;
+  }
+  .print-clinic-identity h1 {
+    margin: 0;
+    font-size: 18pt;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  .print-clinic-identity p {
+    margin: 3px 0 0;
+    color: #64748b;
+    font-size: 8.5pt;
+  }
+  .print-document-title {
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .print-document-title h2 {
+    margin: 0;
+    color: #334155;
+    font-size: 12pt;
+    font-weight: 700;
+  }
+  .print-document-title p {
+    margin: 3px 0 0;
+    color: #64748b;
+  }
+  .print-patient-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px 18px;
+    padding: 9px 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .print-patient-grid div {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .print-patient-grid span,
+  .print-document-footer span {
+    color: #64748b;
+    font-size: 7.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .print-patient-grid strong {
+    font-size: 9pt;
+    font-weight: 600;
+  }
+  .print-clinical-section {
+    margin-top: 7px;
+  }
+  .print-clinical-section h3 {
+    margin: 0 0 5px;
+    padding-bottom: 3px;
+    border-bottom: 1px solid #dbe5e8;
+    color: #0f766e;
+    font-size: 10pt;
+    font-weight: 700;
+    break-after: avoid;
+  }
+  .print-note-row {
+    margin: 0 0 4px;
+    break-inside: avoid;
+  }
+  .print-note-row h4 {
+    margin: 0 0 1px;
+    color: #475569;
+    font-size: 8.5pt;
+    font-weight: 700;
+  }
+  .print-note-row p {
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .print-muted {
+    margin: 0;
+    color: #64748b;
+    font-style: italic;
+  }
+  .print-diagnosis-list {
+    margin: 0;
+    padding-left: 17px;
+  }
+  .print-diagnosis-list li {
+    margin-bottom: 3px;
+    break-inside: avoid;
+  }
+  .print-diagnosis-list p {
+    margin: 1px 0 0;
+    color: #475569;
+  }
+  .print-prescription-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8pt;
+  }
+  .print-prescription-table thead {
+    display: table-header-group;
+  }
+  .print-prescription-table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .print-prescription-table th {
+    padding: 4px;
+    text-align: left;
+    background: #f1f5f9 !important;
+    border: 1px solid #dbe3e8;
+    font-weight: 700;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-prescription-table td {
+    padding: 4px;
+    vertical-align: top;
+    border: 1px solid #e2e8f0;
+    overflow-wrap: anywhere;
+  }
+  .print-prescription-table small {
+    display: block;
+    margin-top: 2px;
+    color: #64748b;
+  }
+  .print-document-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 16px;
+    margin-top: 10px;
+    padding-top: 6px;
+    border-top: 1px solid #e2e8f0;
+    break-inside: avoid;
+  }
+  .print-signature-line {
+    width: 170px;
+    height: 22px;
+    margin: 3px 0;
+    border-bottom: 1px solid #94a3b8;
+  }
+  .print-document-footer strong {
+    font-size: 8.5pt;
+  }
+  .print-document-footer p {
+    max-width: 230px;
+    margin: 0;
+    color: #64748b;
+    font-size: 7.5pt;
+    text-align: right;
+  }
+}

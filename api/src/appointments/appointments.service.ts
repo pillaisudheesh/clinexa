@@ -72,12 +72,21 @@ export class AppointmentsService {
       throw new NotFoundException('Active doctor not found');
     }
 
+    const linkedDoctorId = await this.getLinkedDoctorId(clinicId, actorId);
+    if (linkedDoctorId && linkedDoctorId !== doctor.id) {
+      throw new NotFoundException('Active doctor not found');
+    }
+
     this.validateAppointmentTime(dto.startTime, dto.endTime);
 
     const appointmentDate = this.parseDate(dto.appointmentDate);
 
-    this.validateNotInPast(appointmentDate, dto.startTime);
     const clinicHours = await this.getClinicWorkingHours(clinicId);
+    this.validateNotInPast(
+      appointmentDate,
+      dto.startTime,
+      clinicHours.timezone,
+    );
     this.validateAgainstClinicHours(
       clinicHours,
       appointmentDate,
@@ -95,7 +104,7 @@ export class AppointmentsService {
     });
 
     if (schedule) {
-      const dayOfWeek = appointmentDate.getDay();
+      const dayOfWeek = appointmentDate.getUTCDay();
       const scheduleSlot = schedule.slots.find(
         (slot) =>
           slot.dayOfWeek === dayOfWeek &&
@@ -212,13 +221,13 @@ export class AppointmentsService {
   /**
    * Get paginated appointments.
    */
-  async findAll(clinicId: string, query: AppointmentQueryDto) {
+  async findAll(clinicId: string, query: AppointmentQueryDto, userId: string) {
     const {
       page = 1,
       limit = 10,
       search,
       sortBy,
-      sortOrder = SortOrder.ASC,
+      sortOrder = SortOrder.DESC,
       patientId,
       doctorId,
       status,
@@ -248,11 +257,12 @@ export class AppointmentsService {
       }),
     };
 
+    await this.applyDoctorScope(clinicId, userId, where);
+
     if (appointmentDate) {
       const date = this.parseDate(appointmentDate);
 
-      const nextDate = new Date(date);
-      nextDate.setDate(nextDate.getDate() + 1);
+      const nextDate = this.nextDate(date);
 
       where.appointmentDate = {
         gte: date,
@@ -266,8 +276,7 @@ export class AppointmentsService {
       }
 
       if (toDate) {
-        const endDate = this.parseDate(toDate);
-        endDate.setDate(endDate.getDate() + 1);
+        const endDate = this.nextDate(this.parseDate(toDate));
         dateFilter.lt = endDate;
       }
 
@@ -343,6 +352,7 @@ export class AppointmentsService {
       'type',
       'createdAt',
     ]);
+    console.log(sortOrder);
 
     const safeSortBy =
       sortBy && allowedSortFields.has(sortBy) ? sortBy : 'appointmentDate';
@@ -383,7 +393,9 @@ export class AppointmentsService {
   /**
    * Get a single appointment.
    */
-  async findOne(clinicId: string, id: string) {
+  async findOne(clinicId: string, id: string, userId: string) {
+    await this.assertAppointmentOwnership(clinicId, id, userId);
+
     const appointment = await this.prisma.appointment.findFirst({
       where: {
         id,
@@ -409,6 +421,8 @@ export class AppointmentsService {
     dto: UpdateAppointmentDto,
     actorId: string,
   ) {
+    await this.assertAppointmentOwnership(clinicId, id, actorId);
+
     const existing = await this.prisma.appointment.findFirst({
       where: {
         id,
@@ -437,8 +451,8 @@ export class AppointmentsService {
     this.validateAppointmentTime(startTime, endTime);
 
     if (dto.appointmentDate || dto.startTime || dto.endTime) {
-      this.validateNotInPast(appointmentDate, startTime);
       const clinicHours = await this.getClinicWorkingHours(clinicId);
+      this.validateNotInPast(appointmentDate, startTime, clinicHours.timezone);
       this.validateAgainstClinicHours(
         clinicHours,
         appointmentDate,
@@ -468,7 +482,7 @@ export class AppointmentsService {
       });
 
       if (schedule) {
-        const dayOfWeek = appointmentDate.getDay();
+        const dayOfWeek = appointmentDate.getUTCDay();
         const scheduleSlot = schedule.slots.find(
           (slot) =>
             slot.dayOfWeek === dayOfWeek &&
@@ -590,6 +604,8 @@ export class AppointmentsService {
     reason: string | undefined,
     actorId: string,
   ) {
+    await this.assertAppointmentOwnership(clinicId, id, actorId);
+
     const updated = await this.prisma.$transaction(async (tx) => {
       const appointment = await tx.appointment.findFirst({
         where: { id, clinicId },
@@ -644,7 +660,13 @@ export class AppointmentsService {
   async getAvailability(
     clinicId: string,
     query: AppointmentAvailabilityQueryDto,
+    userId: string,
   ) {
+    const linkedDoctorId = await this.getLinkedDoctorId(clinicId, userId);
+    if (linkedDoctorId && linkedDoctorId !== query.doctorId) {
+      throw new NotFoundException('Active doctor not found');
+    }
+
     const doctor = await this.prisma.doctor.findFirst({
       where: {
         id: query.doctorId,
@@ -706,7 +728,7 @@ export class AppointmentsService {
       };
     }
 
-    const dayOfWeek = date.getDay();
+    const dayOfWeek = date.getUTCDay();
 
     const workingSlots = schedule.slots.filter(
       (slot) =>
@@ -810,6 +832,8 @@ export class AppointmentsService {
    * Check patient in.
    */
   async checkIn(clinicId: string, id: string, actorId: string) {
+    await this.assertAppointmentOwnership(clinicId, id, actorId);
+
     const result = await this.prisma.$transaction(async (tx) => {
       const appointment = await tx.appointment.findFirst({
         where: {
@@ -958,6 +982,8 @@ export class AppointmentsService {
    * can be marked as completed.
    */
   async complete(clinicId: string, id: string, actorId: string) {
+    await this.assertAppointmentOwnership(clinicId, id, actorId);
+
     const result = await this.prisma.$transaction(async (tx) => {
       const appointment = await tx.appointment.findFirst({
         where: {
@@ -1059,7 +1085,9 @@ export class AppointmentsService {
   async getConsultation(
     clinicId: string,
     appointmentId: string,
+    userId: string,
   ): Promise<ConsultationSummaryResponseDto> {
+    await this.assertAppointmentOwnership(clinicId, appointmentId, userId);
     const appointment = await this.prisma.appointment.findFirst({
       where: {
         id: appointmentId,
@@ -1407,6 +1435,8 @@ export class AppointmentsService {
       firstName: string;
       middleName: string | null;
       lastName: string;
+      dateOfBirth: Date | null;
+      gender: string;
     };
 
     doctor?: {
@@ -1456,6 +1486,8 @@ export class AppointmentsService {
           firstName: appointment.patient.firstName,
           middleName: appointment.patient.middleName ?? undefined,
           lastName: appointment.patient.lastName,
+          dateOfBirth: appointment?.patient?.dateOfBirth ?? undefined,
+          gender: appointment.patient.gender,
         },
       }),
 
@@ -1495,6 +1527,8 @@ export class AppointmentsService {
     status: AppointmentStatus,
     actorId: string,
   ) {
+    await this.assertAppointmentOwnership(clinicId, id, actorId);
+
     const updated = await this.prisma.$transaction(async (tx) => {
       const appointment = await tx.appointment.findFirst({
         where: { id, clinicId },
@@ -1601,7 +1635,17 @@ export class AppointmentsService {
       openingTime: row.openingTime,
       closingTime: row.closingTime,
       defaultAppointmentDuration: row.defaultAppointmentDuration,
-      workingDays: row.workingDays.split(',').filter(Boolean),
+      workingDays: row.workingDays
+        .split(',')
+        .map((day) => day.trim().toUpperCase())
+        .filter(Boolean),
+      timezone:
+        (
+          await this.prisma.clinic.findUnique({
+            where: { id: clinicId },
+            select: { timezone: true },
+          })
+        )?.timezone ?? 'UTC',
     };
   }
 
@@ -1615,7 +1659,9 @@ export class AppointmentsService {
       'FRIDAY',
       'SATURDAY',
     ];
-    return hours.workingDays.includes(names[date.getDay()]);
+    // Appointment dates are persisted as calendar dates at UTC midnight. Use
+    // UTC calendar arithmetic so the server's timezone cannot change weekdays.
+    return hours.workingDays.includes(names[date.getUTCDay()]);
   }
 
   private validateAgainstClinicHours(
@@ -1656,14 +1702,14 @@ export class AppointmentsService {
     }
   }
 
-  private validateNotInPast(date: Date, startTime: string) {
+  private validateNotInPast(date: Date, startTime: string, timezone: string) {
     const now = new Date();
-
-    const appointmentDateTime = new Date(date);
-
-    const [hours, minutes] = startTime.split(':').map(Number);
-
-    appointmentDateTime.setHours(hours, minutes, 0, 0);
+    const dateText = date.toISOString().slice(0, 10);
+    const appointmentDateTime = this.clinicLocalDateTimeToUtc(
+      dateText,
+      startTime,
+      timezone,
+    );
 
     if (appointmentDateTime <= now) {
       throw new BadRequestException(
@@ -1858,21 +1904,78 @@ export class AppointmentsService {
   }
 
   private parseDate(value: string): Date {
-    const date = new Date(value);
+    // Date-only inputs represent a clinic calendar date, not an instant. Store
+    // them at UTC midnight so the value is stable regardless of server TZ.
+    const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    const date = dateOnly
+      ? new Date(
+          Date.UTC(
+            Number(dateOnly[1]),
+            Number(dateOnly[2]) - 1,
+            Number(dateOnly[3]),
+          ),
+        )
+      : new Date(value);
 
     if (Number.isNaN(date.getTime())) {
       throw new BadRequestException(`Invalid date: ${value}`);
     }
-
+    if (dateOnly && date.toISOString().slice(0, 10) !== value) {
+      throw new BadRequestException(`Invalid date: ${value}`);
+    }
     return date;
   }
 
   private nextDate(date: Date): Date {
     const next = new Date(date);
-
-    next.setDate(next.getDate() + 1);
-
+    next.setUTCDate(next.getUTCDate() + 1);
     return next;
+  }
+
+  /** Convert a clinic-local calendar date and HH:mm time into a UTC instant. */
+  private clinicLocalDateTimeToUtc(
+    dateText: string,
+    timeText: string,
+    timezone: string,
+  ): Date {
+    const [year, month, day] = dateText.split('-').map(Number);
+    const [hours, minutes] = timeText.split(':').map(Number);
+    const desiredUtc = Date.UTC(year, month - 1, day, hours, minutes, 0, 0);
+    let candidate = desiredUtc;
+
+    try {
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle: 'h23',
+      });
+      // Iterate to account for the timezone offset at the target date, including DST.
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const parts = formatter.formatToParts(new Date(candidate));
+        const values = Object.fromEntries(
+          parts.map((part) => [part.type, part.value]),
+        );
+        const representedUtc = Date.UTC(
+          Number(values.year),
+          Number(values.month) - 1,
+          Number(values.day),
+          Number(values.hour),
+          Number(values.minute),
+          Number(values.second),
+        );
+        const delta = desiredUtc - representedUtc;
+        candidate += delta;
+        if (delta === 0) break;
+      }
+    } catch {
+      throw new BadRequestException(`Invalid clinic timezone: ${timezone}`);
+    }
+    return new Date(candidate);
   }
 
   private async generateAppointmentNumber(
@@ -1919,6 +2022,8 @@ export class AppointmentsService {
           firstName: true,
           middleName: true,
           lastName: true,
+          dateOfBirth: true,
+          gender: true,
         },
       },
 
@@ -1971,6 +2076,8 @@ export class AppointmentsService {
         firstName: appointment.patient.firstName,
         middleName: appointment.patient.middleName ?? undefined,
         lastName: appointment.patient.lastName,
+        dateOfBirth: appointment.patient.dateOfBirth ?? undefined,
+        gender: appointment.patient.gender,
       },
 
       doctor: {
@@ -2026,6 +2133,76 @@ export class AppointmentsService {
       'Unable to allocate a unique invoice number. Please retry the operation.',
     );
   }
+
+  /**
+   * Resolve the doctor profile linked to the authenticated user.
+   * A linked doctor must not access another doctor's appointments.
+   */
+  private async getLinkedDoctorId(
+    clinicId: string,
+    userId: string,
+  ): Promise<string | null> {
+    const doctor = await this.prisma.doctor.findFirst({
+      where: {
+        userId,
+        clinicId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    return doctor?.id ?? null;
+  }
+
+  /**
+   * Restrict a query to the linked doctor's appointments.
+   * If a user has a linked doctor profile, any requested doctorId
+   * must not override that profile's identity.
+   */
+  private async applyDoctorScope(
+    clinicId: string,
+    userId: string,
+    where: Prisma.AppointmentWhereInput,
+  ): Promise<void> {
+    const linkedDoctorId = await this.getLinkedDoctorId(clinicId, userId);
+
+    if (linkedDoctorId) {
+      where.doctorId = linkedDoctorId;
+    }
+  }
+
+  /**
+   * Verify that a linked doctor owns the requested appointment.
+   */
+  private async assertAppointmentOwnership(
+    clinicId: string,
+    appointmentId: string,
+    userId: string,
+  ): Promise<void> {
+    const linkedDoctorId = await this.getLinkedDoctorId(clinicId, userId);
+
+    // Non-doctor users retain clinic-level access as governed by the
+    // endpoint permission guard. Ensure every doctor account is linked to a
+    // Doctor profile; an unlinked doctor cannot be identified from this
+    // service method alone.
+    if (!linkedDoctorId) {
+      return;
+    }
+
+    const appointment = await this.prisma.appointment.findFirst({
+      where: {
+        id: appointmentId,
+        clinicId,
+        doctorId: linkedDoctorId,
+      },
+      select: { id: true },
+    });
+
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+  }
 }
 
 type AppointmentWithRelations = Prisma.AppointmentGetPayload<{
@@ -2037,6 +2214,8 @@ type AppointmentWithRelations = Prisma.AppointmentGetPayload<{
         firstName: true;
         middleName: true;
         lastName: true;
+        dateOfBirth: true;
+        gender: true;
       };
     };
 

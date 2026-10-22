@@ -16,10 +16,10 @@ import { ApiBearerAuth } from '@nestjs/swagger';
 
 import { BillingService } from './billing.service';
 
-import { CreateInvoiceDto } from './dto/create-invoice.dto';
-import { UpdateInvoiceDto } from './dto/update-invoice.dto';
+import { CreateBillingInvoiceDto } from './dto/create-invoice.dto';
+import { UpdateBillingInvoiceDto } from './dto/update-invoice.dto';
 import { InvoiceQueryDto } from './dto/invoice-query.dto';
-import { CreatePaymentDto } from './dto/create-payment.dto';
+import { CreateBillingPaymentDto } from './dto/create-payment.dto';
 
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { PermissionCodes } from '../auth/constants/permission-codes';
@@ -42,7 +42,10 @@ export class BillingController {
 
   @Post()
   @Permissions(PermissionCodes.BILLING_CREATE)
-  create(@Req() req: AuthenticatedRequest, @Body() dto: CreateInvoiceDto) {
+  create(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: CreateBillingInvoiceDto,
+  ) {
     return this.billingService.create(req.user.clinicId, dto);
   }
 
@@ -63,7 +66,7 @@ export class BillingController {
   update(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
-    @Body() dto: UpdateInvoiceDto,
+    @Body() dto: UpdateBillingInvoiceDto,
   ) {
     return this.billingService.update(req.user.clinicId, id, dto);
   }
@@ -73,7 +76,7 @@ export class BillingController {
   createPayment(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
-    @Body() dto: CreatePaymentDto,
+    @Body() dto: CreateBillingPaymentDto,
   ) {
     return this.billingService.createPayment(req.user.clinicId, id, dto);
   }

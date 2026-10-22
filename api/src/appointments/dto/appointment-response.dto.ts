@@ -38,6 +38,8 @@ export class AppointmentResponseDto {
     firstName: string;
     middleName?: string;
     lastName: string;
+    dateOfBirth?: Date;
+    gender: string;
   };
 
   doctor?: {

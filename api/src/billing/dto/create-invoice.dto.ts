@@ -2,8 +2,14 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { InvoiceType } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
-  ArrayMinSize, IsArray, IsEnum, IsOptional, IsString, IsUUID,
-  Matches, ValidateNested,
+  ArrayMinSize,
+  IsArray,
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+  ValidateNested,
 } from 'class-validator';
 
 const NON_NEGATIVE_MONEY = /^\d+(\.\d{1,2})?$/;
@@ -33,7 +39,7 @@ export class CreateInvoiceItemDto {
   pharmacyDispensingItemId?: string;
 }
 
-export class CreateInvoiceDto {
+export class CreateBillingInvoiceDto {
   @ApiProperty()
   @IsUUID()
   patientId!: string;

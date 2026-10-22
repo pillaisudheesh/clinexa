@@ -163,16 +163,6 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 
-@media print {
-  .print-hidden {
-    display: none !important;
-  }
-  .print-compact {
-    zoom: 0.9;
-  }
-}
-
-
 /* Match the Billing listing: a thin, subtle separator between data rows. */
 .settings-list-table tbody tr:not(:last-child) > td {
   border-bottom: 1px solid #f1f5f9 !important;
@@ -182,7 +172,6 @@ a {
 .settings-mobile-user-action {
   border-top: 1px solid #f1f5f9 !important;
 }
-
 
 /* Departments table: override the app-wide dark default border token so row
    separators match the light, subtle separators used by Patients and Billing. */
@@ -197,14 +186,12 @@ a {
   border-bottom: 1px solid #f1f5f9 !important;
 }
 
-
 /* Settings: keep the working-hours card header divider light despite the global border token. */
 .settings-working-hours-header {
   border-bottom-color: #f1f5f9 !important;
   border-bottom-width: 1px !important;
   border-bottom-style: solid !important;
 }
-
 
 /* Clinic branding: override the app-wide dark border token for the light Settings UI. */
 .clinic-branding-header {
@@ -217,4 +204,18 @@ a {
 }
 .clinic-branding-logo {
   border-color: #e2e8f0 !important;
+}
+
+/* Consultation history: keep previous-visit cards aligned with SamaRoot's
+   light, low-contrast surface and border language despite the global dark token. */
+.consultation-history-card {
+  border: 1px solid #e2e8f0 !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.025);
+}
+.consultation-history-card:hover {
+  border-color: #ccfbf1 !important;
+}
+.consultation-history-record-id {
+  border-top: 1px solid #f1f5f9 !important;
 }

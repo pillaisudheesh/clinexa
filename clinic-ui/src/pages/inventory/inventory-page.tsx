@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/auth-context";
 import { ButtonSpinner } from "@/components/ui/button-spinner";
 import { PageLoader } from "@/components/ui/page-loader";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { medicineService } from "@/services/medicine-service";
 import { inventoryService } from "@/services/inventory-service";
 import type { Medicine } from "@/types/medicine";
@@ -638,7 +639,7 @@ export function InventoryPage() {
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <SummaryCard
           label="Medicines"
           value={summary?.totalMedicines ?? 0}
@@ -663,8 +664,28 @@ export function InventoryPage() {
         />
       </div>
 
-      <div className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:mx-0 sm:px-0">
-        <div className="flex w-max min-w-full items-center gap-1 rounded-xl bg-slate-100/70 p-1 sm:min-w-0 sm:w-fit">
+      <div className="w-full pb-1">
+        <div className="sm:hidden">
+          <label
+            htmlFor="inventory-section"
+            className="mb-1.5 block text-xs font-medium text-slate-500"
+          >
+            Inventory section
+          </label>
+          <SearchableSelect
+            value={tab}
+            options={[
+              { value: "stock", label: "Current stock" },
+              { value: "alerts", label: "Stock alerts" },
+              { value: "transactions", label: "Transactions" },
+              { value: "receipts", label: "Stock receipts" },
+            ]}
+            placeholder="Select inventory section"
+            searchPlaceholder="Search inventory section..."
+            onChange={(value) => setTab(value as Tab)}
+          />
+        </div>
+        <div className="hidden w-fit flex-wrap items-center gap-1 rounded-xl bg-slate-100/70 p-1 sm:flex">
           {(
             [
               ["stock", "Current stock"],
@@ -677,7 +698,7 @@ export function InventoryPage() {
               key={value}
               type="button"
               onClick={() => setTab(value)}
-              className={`shrink-0 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition ${tab === value ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+              className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition ${tab === value ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
             >
               {label}
             </button>
@@ -706,13 +727,13 @@ export function InventoryPage() {
             />
           ) : (
             <div className="overflow-hidden rounded-2xl bg-white shadow-[0_8px_30px_rgba(15,23,42,0.04)] ring-1 ring-slate-200/60">
-              <div className="hidden grid-cols-[2fr_1fr_1fr_0.8fr_1fr] gap-4 px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400 md:grid">
-                <span>Medicine</span>
-                <span>Batch</span>
-                <span>Expiry</span>
-                <span>Stock</span>
-                <span>Sell price</span>
-                <span className="text-right">Actions</span>
+              <div className="hidden grid-cols-[minmax(0,1.7fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,0.75fr)_minmax(0,0.9fr)_minmax(88px,auto)] items-center gap-3 px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400 md:grid">
+                <span className="whitespace-nowrap">Medicine</span>
+                <span className="whitespace-nowrap">Batch</span>
+                <span className="whitespace-nowrap">Expiry</span>
+                <span className="whitespace-nowrap">Stock</span>
+                <span className="whitespace-nowrap">Sell price</span>
+                <span className="whitespace-nowrap text-right">Actions</span>
               </div>
               {batches.length === 0 ? (
                 <div className="flex min-h-52 flex-col items-center justify-center px-6 text-center">
@@ -732,22 +753,34 @@ export function InventoryPage() {
                 batches.map((row) => (
                   <div
                     key={row.id}
-                    className="grid gap-3 px-4 py-4 transition hover:bg-slate-50/60 md:grid-cols-[2fr_1fr_1fr_0.8fr_1fr_auto] md:items-center md:px-5 md:ring-1 md:ring-slate-100/70"
+                    className="grid gap-3 shadow-[inset_0_-1px_0_0_#e8eef3] px-4 py-4 transition last:shadow-none hover:bg-slate-50/60 sm:grid-cols-2 md:grid-cols-[minmax(0,1.7fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,0.75fr)_minmax(0,0.9fr)_minmax(88px,auto)] md:items-center md:px-5"
                   >
-                    <div>
-                      <p className="text-sm font-semibold text-slate-700">
+                    <div className="min-w-0 sm:col-span-2 md:col-span-1">
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-400 md:hidden">
+                        Medicine
+                      </span>
+                      <p className="break-words text-sm font-semibold text-slate-700">
                         {row.medicineName}
                       </p>
                     </div>
-                    <div>
-                      <span className="rounded-lg bg-slate-50 px-2.5 py-1 font-mono text-xs text-slate-500">
+                    <div className="min-w-0">
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-400 md:hidden">
+                        Batch
+                      </span>
+                      <span className="inline-block max-w-full break-all rounded-lg bg-slate-50 px-2.5 py-1 font-mono text-xs text-slate-500">
                         {row.batchNumber}
                       </span>
                     </div>
                     <div className="text-xs text-slate-500">
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-400 md:hidden">
+                        Expiry
+                      </span>
                       {formatDate(row.expiryDate)}
                     </div>
                     <div>
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-400 md:hidden">
+                        Available stock
+                      </span>
                       <span
                         className={`text-sm font-semibold ${row.isLowStock ? "text-amber-600" : "text-slate-700"}`}
                       >
@@ -756,6 +789,9 @@ export function InventoryPage() {
                       <span className="ml-1 text-xs text-slate-400">units</span>
                     </div>
                     <div className="text-sm font-medium text-slate-600">
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-400 md:hidden">
+                        Sell price
+                      </span>
                       {money(row.sellingPrice)}
                     </div>
                     <div className="flex justify-start md:justify-end">
@@ -779,7 +815,7 @@ export function InventoryPage() {
                 ))
               )}
               {totalPages > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 ring-1 ring-slate-100">
+                <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3">
                   <p className="text-xs text-slate-400">
                     Page {page} of {totalPages}
                   </p>
@@ -846,12 +882,12 @@ export function InventoryPage() {
             />
           ) : (
             <div className="overflow-hidden rounded-2xl bg-white shadow-[0_8px_30px_rgba(15,23,42,0.04)] ring-1 ring-slate-200/60">
-              <div className="hidden grid-cols-[1.6fr_0.9fr_1fr_0.8fr_0.9fr] gap-4 px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400 md:grid">
-                <span>Medicine</span>
-                <span>Activity</span>
-                <span>Quantity</span>
-                <span>Stock change</span>
-                <span>Date</span>
+              <div className="hidden grid-cols-[minmax(0,1.45fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,0.95fr)] items-center gap-3 px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400 md:grid">
+                <span className="whitespace-nowrap">Medicine</span>
+                <span className="whitespace-nowrap">Activity</span>
+                <span className="whitespace-nowrap">Quantity</span>
+                <span className="whitespace-nowrap">Stock change</span>
+                <span className="whitespace-nowrap">Date</span>
               </div>
               {transactions.length === 0 ? (
                 <div className="flex min-h-52 flex-col items-center justify-center px-6 text-center">
@@ -868,10 +904,13 @@ export function InventoryPage() {
                 transactions.map((transaction) => (
                   <div
                     key={transaction.id}
-                    className="grid gap-3 px-4 py-4 transition hover:bg-slate-50/60 md:grid-cols-[1.6fr_0.9fr_1fr_0.8fr_0.9fr] md:items-center md:px-5 md:ring-1 md:ring-slate-100/70"
+                    className="grid gap-3 shadow-[inset_0_-1px_0_0_#e8eef3] px-4 py-4 transition last:shadow-none hover:bg-slate-50/60 sm:grid-cols-2 md:grid-cols-[minmax(0,1.45fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,0.95fr)] md:items-center md:px-5"
                   >
-                    <div>
-                      <p className="text-sm font-semibold text-slate-700">
+                    <div className="min-w-0 sm:col-span-2 md:col-span-1">
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-400 md:hidden">
+                        Medicine / batch
+                      </span>
+                      <p className="break-words text-sm font-semibold text-slate-700">
                         {transaction.medicineName}
                       </p>
                       <p className="mt-0.5 font-mono text-xs text-slate-400">
@@ -879,6 +918,9 @@ export function InventoryPage() {
                       </p>
                     </div>
                     <div>
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-400 md:hidden">
+                        Activity
+                      </span>
                       <span
                         className={`inline-flex rounded-lg px-2.5 py-1 text-xs font-medium ring-1 ${transactionTone(transaction.type)}`}
                       >
@@ -886,6 +928,9 @@ export function InventoryPage() {
                       </span>
                     </div>
                     <div className="text-sm font-semibold text-slate-700">
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-400 md:hidden">
+                        Quantity
+                      </span>
                       {transaction.type === "DISPENSE" ||
                       transaction.type === "ADJUSTMENT_OUT" ||
                       transaction.type === "EXPIRED"
@@ -894,9 +939,15 @@ export function InventoryPage() {
                       {transaction.quantity}
                     </div>
                     <div className="text-sm text-slate-500">
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-400 md:hidden">
+                        Stock change
+                      </span>
                       {transaction.previousQuantity} → {transaction.newQuantity}
                     </div>
                     <div className="text-xs text-slate-500">
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-400 md:hidden">
+                        Date
+                      </span>
                       {formatDate(transaction.createdAt)}
                     </div>
                     {transaction.notes && (
@@ -908,7 +959,7 @@ export function InventoryPage() {
                 ))
               )}
               {transactionTotalPages > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 ring-1 ring-slate-100">
+                <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3">
                   <p className="text-xs text-slate-400">
                     Page {transactionPage} of {transactionTotalPages}
                   </p>
@@ -1006,7 +1057,7 @@ export function InventoryPage() {
                 ))
               )}
               {receiptTotalPages > 1 && (
-                <div className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 ring-1 ring-slate-100">
+                <div className="flex items-center justify-between rounded-2xl bg-white border-t border-slate-100 px-4 py-3">
                   <p className="text-xs text-slate-400">
                     Page {receiptPage} of {receiptTotalPages}
                   </p>

@@ -11,7 +11,7 @@ import {
   X,
 } from "lucide-react";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { appointmentService } from "@/services/appointment-service";
@@ -31,6 +31,7 @@ import type { Patient } from "@/types/patient";
 
 import { AppointmentRegistrationModal } from "./appointment-registration-modal";
 import { AppointmentDetailsModal } from "./appointment-details-modal";
+import { AppointmentCalendar } from "@/components/appointments/appointment-calendar";
 
 const PAGE_SIZE = 10;
 
@@ -524,6 +525,26 @@ function AppointmentMobileCard({
   );
 }
 
+function toLocalDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function startOfWeek(date: Date) {
+  const result = new Date(date);
+  result.setHours(0, 0, 0, 0);
+  result.setDate(result.getDate() - result.getDay());
+  return result;
+}
+
+function addDays(date: Date, days: number) {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
 export function AppointmentsPage() {
   const { user, hasPermission, hasRole } = useAuth();
   const navigate = useNavigate();
@@ -551,6 +572,12 @@ export function AppointmentsPage() {
   const [showFilters, setShowFilters] = useState(false);
 
   const [showRegistration, setShowRegistration] = useState(false);
+  const [calendarMode, setCalendarMode] = useState<"agenda" | "calendar">(
+    "calendar",
+  );
+  const [registrationInitialDate, setRegistrationInitialDate] = useState<
+    string | undefined
+  >();
 
   const [patients, setPatients] = useState<Patient[]>([]);
 
@@ -647,7 +674,7 @@ export function AppointmentsPage() {
         type: type || undefined,
         appointmentDate: appointmentDate || undefined,
         sortBy: "appointmentDate",
-        sortOrder: "asc",
+        sortOrder: "desc",
       });
 
       setAppointments(Array.isArray(response.items) ? response.items : []);
@@ -874,7 +901,7 @@ export function AppointmentsPage() {
             focus:ring-2
             focus:ring-teal-500/20
           "
-        >
+          >
             <Plus size={17} />
             New appointment
           </button>
@@ -1127,9 +1154,23 @@ export function AppointmentsPage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-slate-400">
-              <Clock3 size={14} />
-              Upcoming schedule
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex rounded-xl bg-slate-50 p-1 ring-1 ring-slate-200/70">
+                <button
+                  type="button"
+                  onClick={() => setCalendarMode("calendar")}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${calendarMode === "calendar" ? "bg-white text-teal-700 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                >
+                  Calendar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCalendarMode("agenda")}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${calendarMode === "agenda" ? "bg-white text-teal-700 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                >
+                  Agenda
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1168,7 +1209,22 @@ export function AppointmentsPage() {
               Try again
             </button>
           </div>
-        ) : appointments.length === 0 ? (
+        ) : calendarMode === "calendar" ? (
+          <div className="p-4 sm:p-5">
+            <AppointmentCalendar
+              canRead={canReadAppointments}
+              status={status}
+              type={type}
+              onDateSelect={(date) => {
+                setRegistrationInitialDate(date);
+                if (canCreateAppointments) setShowRegistration(true);
+              }}
+              onAppointmentSelect={(appointment) =>
+                openAppointmentDetails(appointment.id)
+              }
+            />
+          </div>
+        ) : calendarMode === "agenda" && appointments.length === 0 ? (
           <div className="flex min-h-[360px] flex-col items-center justify-center">
             <div className="flex size-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-300">
               <CalendarDays size={22} />
@@ -1325,11 +1381,16 @@ export function AppointmentsPage() {
       {canCreateAppointments && (
         <AppointmentRegistrationModal
           open={showRegistration}
+          initialDate={registrationInitialDate}
           patients={patients}
           doctors={doctors}
-          onClose={() => setShowRegistration(false)}
+          onClose={() => {
+            setShowRegistration(false);
+            setRegistrationInitialDate(undefined);
+          }}
           onCreated={async () => {
             setShowRegistration(false);
+            setRegistrationInitialDate(undefined);
             await loadAppointments();
           }}
         />

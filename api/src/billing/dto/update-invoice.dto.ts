@@ -3,7 +3,7 @@ import { IsOptional, IsString, Matches } from 'class-validator';
 
 const NON_NEGATIVE_MONEY = /^\d+(\.\d{1,2})?$/;
 
-export class UpdateInvoiceDto {
+export class UpdateBillingInvoiceDto {
   @ApiPropertyOptional({ example: '0.00' })
   @IsOptional()
   @Matches(NON_NEGATIVE_MONEY)

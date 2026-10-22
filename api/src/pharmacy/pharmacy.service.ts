@@ -178,7 +178,10 @@ export class PharmacyService {
       };
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const result = await tx.medicine.update({ where: { id, clinicId }, data });
+      const result = await tx.medicine.update({
+        where: { id, clinicId },
+        data,
+      });
       if (Object.keys(changedFields).length) {
         await this.auditService.createInTransaction(tx, {
           clinicId,

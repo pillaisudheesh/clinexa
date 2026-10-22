@@ -22,6 +22,15 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+import { AppointmentRegistrationModal } from "@/pages/appointments/appointment-registration-modal";
+import { AppointmentCalendar } from "@/components/appointments/appointment-calendar";
+import { AppointmentDetailsModal } from "@/pages/appointments/appointment-details-modal";
+import { patientService } from "@/services/patient-service";
+import { doctorService } from "@/services/doctor-service";
+import type { Patient } from "@/types/patient";
+import type { Doctor } from "@/types/doctor";
+import type { Appointment } from "@/types/appointment";
+
 import { useAuth } from "@/auth/auth-context";
 import { appointmentService } from "@/services/appointment-service";
 
@@ -101,6 +110,64 @@ function statusClass(status: string) {
 export function DashboardPage() {
   const { user, loading: authLoading, hasPermission, hasRole } = useAuth();
   const navigate = useNavigate();
+  const canCreateAppointments = hasPermission("APPOINTMENT_CREATE");
+  const [showRegistration, setShowRegistration] = useState(false);
+  const [dashboardRegistrationDate, setDashboardRegistrationDate] = useState<
+    string | undefined
+  >();
+  const [appointmentPanelView, setAppointmentPanelView] = useState<
+    "list" | "calendar"
+  >("list");
+  const [selectedCalendarAppointment, setSelectedCalendarAppointment] =
+    useState<Appointment | null>(null);
+  const [selectedCalendarAppointmentId, setSelectedCalendarAppointmentId] =
+    useState<string | null>(null);
+  const [calendarAppointmentLoading, setCalendarAppointmentLoading] =
+    useState(false);
+  const [
+    calendarAppointmentActionLoading,
+    setCalendarAppointmentActionLoading,
+  ] = useState(false);
+  const [registrationPatients, setRegistrationPatients] = useState<Patient[]>(
+    [],
+  );
+  const [registrationDoctors, setRegistrationDoctors] = useState<Doctor[]>([]);
+
+  useEffect(() => {
+    if (!canCreateAppointments) return;
+
+    const loadRegistrationOptions = async () => {
+      try {
+        const [patientResponse, doctorResponse] = await Promise.all([
+          patientService.getPatients({
+            page: 1,
+            limit: 100,
+            sortBy: "createdAt",
+            sortOrder: "desc",
+          }),
+          doctorService.getDoctors({
+            page: 1,
+            limit: 100,
+            isActive: true,
+            sortOrder: "asc",
+          }),
+        ]);
+        setRegistrationPatients(
+          Array.isArray(patientResponse.data) ? patientResponse.data : [],
+        );
+        setRegistrationDoctors(
+          Array.isArray(doctorResponse.data) ? doctorResponse.data : [],
+        );
+      } catch (requestError) {
+        console.error(
+          "Unable to load appointment registration options.",
+          requestError,
+        );
+      }
+    };
+
+    loadRegistrationOptions();
+  }, [canCreateAppointments]);
 
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
 
@@ -216,6 +283,36 @@ export function DashboardPage() {
     }
   };
 
+  const openDashboardAppointment = async (appointment: Appointment) => {
+    setSelectedCalendarAppointmentId(appointment.id);
+    setSelectedCalendarAppointment(null);
+    setCalendarAppointmentLoading(true);
+    try {
+      const fullAppointment = await appointmentService.getAppointment(
+        appointment.id,
+      );
+      setSelectedCalendarAppointment(fullAppointment);
+    } catch (requestError) {
+      console.error(
+        "Unable to load appointment details from dashboard calendar.",
+        requestError,
+      );
+      setActionError("Unable to load appointment details. Please try again.");
+      setSelectedCalendarAppointmentId(null);
+    } finally {
+      setCalendarAppointmentLoading(false);
+    }
+  };
+
+  const refreshSelectedCalendarAppointment = async () => {
+    if (!selectedCalendarAppointmentId) return;
+    const updated = await appointmentService.getAppointment(
+      selectedCalendarAppointmentId,
+    );
+    setSelectedCalendarAppointment(updated);
+    await loadDashboard(false);
+  };
+
   const appointmentStats = useMemo(() => {
     const counts = new Map(
       summary?.appointmentStatus.map((item) => [item.status, item.count]) ?? [],
@@ -237,7 +334,8 @@ export function DashboardPage() {
         <DashboardHeader
           firstName={firstName}
           onRefresh={loadDashboard}
-          canCreateAppointments={hasPermission("APPOINTMENT_CREATE")}
+          canCreateAppointments={canCreateAppointments}
+          onNewAppointment={() => setShowRegistration(true)}
         />
 
         <div
@@ -287,7 +385,8 @@ export function DashboardPage() {
       <DashboardHeader
         firstName={firstName}
         onRefresh={loadDashboard}
-        canCreateAppointments={hasPermission("APPOINTMENT_CREATE")}
+        canCreateAppointments={canCreateAppointments}
+        onNewAppointment={() => setShowRegistration(true)}
       />
 
       {loading ? (
@@ -299,6 +398,8 @@ export function DashboardPage() {
           <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
             <TodayAppointments
               appointments={summary?.todayAppointments ?? []}
+              view={appointmentPanelView}
+              onViewChange={setAppointmentPanelView}
               canView={summary?.permissions.appointments ?? false}
               canUpdate={canUpdateAppointments}
               canReadMedicalRecords={canReadMedicalRecords}
@@ -321,6 +422,15 @@ export function DashboardPage() {
               onViewConsultation={(appointmentId) =>
                 navigate(`/appointments/${appointmentId}/consultation`)
               }
+              onCalendarDateSelect={(date) => {
+                if (canCreateAppointments) {
+                  setDashboardRegistrationDate(date);
+                  setShowRegistration(true);
+                } else {
+                  navigate("/appointments");
+                }
+              }}
+              onCalendarAppointmentSelect={openDashboardAppointment}
             />
 
             <AppointmentOverview
@@ -337,13 +447,13 @@ export function DashboardPage() {
             }
           >
             {summary?.permissions.patients && (
-              <RecentPatients
-                patients={summary.recentPatients ?? []}
-                canView
-              />
+              <RecentPatients patients={summary.recentPatients ?? []} canView />
             )}
 
-            <QuickActions permissions={summary?.permissions} />
+            <QuickActions
+              permissions={summary?.permissions}
+              onBookAppointment={() => setShowRegistration(true)}
+            />
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
@@ -351,6 +461,121 @@ export function DashboardPage() {
             <OperationalAlerts summary={summary} />
           </div>
         </>
+      )}
+
+      <AppointmentDetailsModal
+        open={Boolean(selectedCalendarAppointmentId)}
+        appointment={selectedCalendarAppointment}
+        loading={calendarAppointmentLoading}
+        confirming={calendarAppointmentActionLoading}
+        checkingIn={calendarAppointmentActionLoading}
+        cancelling={calendarAppointmentActionLoading}
+        startingConsultation={calendarAppointmentActionLoading}
+        onClose={() => {
+          setSelectedCalendarAppointmentId(null);
+          setSelectedCalendarAppointment(null);
+        }}
+        onConfirm={async () => {
+          if (!selectedCalendarAppointment) return;
+          try {
+            setCalendarAppointmentActionLoading(true);
+            await appointmentService.confirmAppointment(
+              selectedCalendarAppointment.id,
+            );
+            await refreshSelectedCalendarAppointment();
+          } catch (error) {
+            console.error("Unable to confirm appointment.", error);
+            setActionError(
+              "Unable to confirm this appointment. Please try again.",
+            );
+          } finally {
+            setCalendarAppointmentActionLoading(false);
+          }
+        }}
+        onCheckIn={async () => {
+          if (!selectedCalendarAppointment) return;
+          try {
+            setCalendarAppointmentActionLoading(true);
+            await appointmentService.checkInAppointment(
+              selectedCalendarAppointment.id,
+            );
+            await refreshSelectedCalendarAppointment();
+          } catch (error) {
+            console.error("Unable to check in appointment.", error);
+            setActionError(
+              "Unable to check in this patient. Please try again.",
+            );
+          } finally {
+            setCalendarAppointmentActionLoading(false);
+          }
+        }}
+        onCancel={async () => {
+          if (!selectedCalendarAppointment) return;
+          const reason = window.prompt(
+            "Reason for cancelling this appointment:",
+          );
+          if (reason === null) return;
+          try {
+            setCalendarAppointmentActionLoading(true);
+            await appointmentService.cancelAppointment(
+              selectedCalendarAppointment.id,
+              reason,
+            );
+            await refreshSelectedCalendarAppointment();
+          } catch (error) {
+            console.error("Unable to cancel appointment.", error);
+            setActionError(
+              "Unable to cancel this appointment. Please try again.",
+            );
+          } finally {
+            setCalendarAppointmentActionLoading(false);
+          }
+        }}
+        onStartConsultation={async () => {
+          if (!selectedCalendarAppointment) return;
+          const id = selectedCalendarAppointment.id;
+          try {
+            setCalendarAppointmentActionLoading(true);
+            await appointmentService.startConsultation(id);
+            await loadDashboard(false);
+            navigate(`/appointments/${id}/consultation`);
+          } catch (error) {
+            console.error("Unable to start consultation.", error);
+            setActionError(
+              "Unable to start this consultation. Please try again.",
+            );
+          } finally {
+            setCalendarAppointmentActionLoading(false);
+          }
+        }}
+        onContinueConsultation={() => {
+          if (selectedCalendarAppointment)
+            navigate(
+              `/appointments/${selectedCalendarAppointment.id}/consultation`,
+            );
+        }}
+        onViewConsultation={() => {
+          if (selectedCalendarAppointment)
+            navigate(
+              `/appointments/${selectedCalendarAppointment.id}/consultation`,
+            );
+        }}
+        canStartConsultation={canStartConsultation}
+        canViewCompletedConsultation={canReadMedicalRecords}
+      />
+
+      {canCreateAppointments && (
+        <AppointmentRegistrationModal
+          open={showRegistration}
+          initialDate={dashboardRegistrationDate}
+          patients={registrationPatients}
+          doctors={registrationDoctors}
+          onClose={() => setShowRegistration(false)}
+          onCreated={async () => {
+            setShowRegistration(false);
+            await loadDashboard(false);
+          }}
+        />
       )}
 
       {actionError && (
@@ -406,10 +631,12 @@ function DashboardHeader({
   firstName,
   onRefresh,
   canCreateAppointments,
+  onNewAppointment,
 }: {
   firstName: string;
   onRefresh: () => void;
   canCreateAppointments: boolean;
+  onNewAppointment: () => void;
 }) {
   function getGreeting(): string {
     const hour = new Date().getHours();
@@ -492,8 +719,9 @@ function DashboardHeader({
         </button>
 
         {canCreateAppointments && (
-          <Link
-            to="/appointments"
+          <button
+            type="button"
+            onClick={onNewAppointment}
             className="
               inline-flex
               items-center
@@ -513,7 +741,7 @@ function DashboardHeader({
           >
             <Plus className="size-4" />
             New appointment
-          </Link>
+          </button>
         )}
       </div>
     </div>
@@ -646,6 +874,8 @@ function MetricGrid({ summary }: { summary: DashboardSummary | null }) {
 
 function TodayAppointments({
   appointments,
+  view,
+  onViewChange,
   canView,
   canUpdate,
   canReadMedicalRecords,
@@ -657,8 +887,12 @@ function TodayAppointments({
   onStartConsultation,
   onContinueConsultation,
   onViewConsultation,
+  onCalendarDateSelect,
+  onCalendarAppointmentSelect,
 }: {
   appointments: DashboardAppointment[];
+  view: "list" | "calendar";
+  onViewChange: (view: "list" | "calendar") => void;
   canView: boolean;
   canUpdate: boolean;
   canReadMedicalRecords: boolean;
@@ -670,6 +904,8 @@ function TodayAppointments({
   onStartConsultation: (appointmentId: string) => void;
   onContinueConsultation: (appointmentId: string) => void;
   onViewConsultation: (appointmentId: string) => void;
+  onCalendarDateSelect: (date: string) => void;
+  onCalendarAppointmentSelect: (appointment: Appointment) => void;
 }) {
   return (
     <section
@@ -694,31 +930,59 @@ function TodayAppointments({
       >
         <div>
           <h3 className="font-semibold text-slate-900">
-            Today&apos;s appointments
+            {view === "calendar"
+              ? "Appointment calendar"
+              : "Today's appointments"}
           </h3>
           <p className="mt-1 text-xs text-slate-400">
-            Your clinic schedule for today
+            {view === "calendar"
+              ? "Select an appointment to view its details"
+              : "Your clinic schedule for today"}
           </p>
         </div>
 
-        <Link
-          to="/appointments"
-          className="
-            inline-flex
-            items-center
-            gap-1
-            text-xs
-            font-semibold
-            text-teal-600
-            hover:text-teal-700
-          "
+        <div
+          className="inline-flex shrink-0 rounded-lg bg-slate-100 p-1"
+          role="group"
+          aria-label="Appointment panel view"
         >
-          View all
-          <ArrowRight className="size-3.5" />
-        </Link>
+          <button
+            type="button"
+            onClick={() => onViewChange("list")}
+            aria-pressed={view === "list"}
+            className={`rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors ${view === "list" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+          >
+            Today
+          </button>
+          <button
+            type="button"
+            onClick={() => onViewChange("calendar")}
+            aria-pressed={view === "calendar"}
+            className={`rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors ${view === "calendar" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+          >
+            Calendar
+          </button>
+        </div>
       </div>
 
-      {!canView ? (
+      {view === "calendar" && canView ? (
+        <div className="p-4 sm:p-5">
+          <AppointmentCalendar
+            canRead={canView}
+            compact
+            onDateSelect={onCalendarDateSelect}
+            onAppointmentSelect={onCalendarAppointmentSelect}
+          />
+          <div className="mt-3 flex justify-end">
+            <Link
+              to="/appointments"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-teal-600 hover:text-teal-700"
+            >
+              Open full calendar <ArrowRight className="size-3.5" />
+            </Link>
+          </div>
+        </div>
+      ) : !canView ? (
         <EmptyState text="You don't have permission to view appointments." />
       ) : appointments.length === 0 ? (
         <EmptyState text="No appointments scheduled for today." />
@@ -1359,7 +1623,9 @@ function RecentActivity({
       <div className="flex items-center justify-between px-5 py-5 sm:px-6">
         <div>
           <h3 className="font-semibold text-slate-900">Recent activity</h3>
-          <p className="mt-1 text-xs text-slate-400">Latest activity across the clinic</p>
+          <p className="mt-1 text-xs text-slate-400">
+            Latest activity across the clinic
+          </p>
         </div>
       </div>
 
@@ -1371,15 +1637,24 @@ function RecentActivity({
             const Icon = icons[activity.type as keyof typeof icons] ?? Activity;
 
             return (
-              <div key={activity.id} className="flex items-start gap-3 rounded-xl bg-slate-50 px-4 py-3">
+              <div
+                key={activity.id}
+                className="flex items-start gap-3 rounded-xl bg-slate-50 px-4 py-3"
+              >
                 <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white text-teal-600 shadow-sm">
                   <Icon className="size-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-slate-800">{activity.title}</p>
-                  <p className="mt-0.5 truncate text-xs text-slate-500">{activity.description}</p>
+                  <p className="text-sm font-semibold text-slate-800">
+                    {activity.title}
+                  </p>
+                  <p className="mt-0.5 truncate text-xs text-slate-500">
+                    {activity.description}
+                  </p>
                 </div>
-                <span className="shrink-0 text-[11px] text-slate-400">{formatRelativeTime(activity.createdAt)}</span>
+                <span className="shrink-0 text-[11px] text-slate-400">
+                  {formatRelativeTime(activity.createdAt)}
+                </span>
               </div>
             );
           })}
@@ -1400,7 +1675,8 @@ function OperationalAlerts({ summary }: { summary: DashboardSummary | null }) {
           tone: "amber" as const,
         }
       : null,
-    summary?.permissions.laboratory && (summary.metrics.pendingLabOrders ?? 0) > 0
+    summary?.permissions.laboratory &&
+    (summary.metrics.pendingLabOrders ?? 0) > 0
       ? {
           label: "Pending laboratory work",
           description: `${summary.metrics.pendingLabOrders} lab order${summary.metrics.pendingLabOrders === 1 ? "" : "s"} awaiting completion`,
@@ -1409,7 +1685,8 @@ function OperationalAlerts({ summary }: { summary: DashboardSummary | null }) {
           tone: "violet" as const,
         }
       : null,
-    summary?.permissions.billing && (summary.metrics.outstandingBillingInvoices ?? 0) > 0
+    summary?.permissions.billing &&
+    (summary.metrics.outstandingBillingInvoices ?? 0) > 0
       ? {
           label: "Outstanding billing",
           description: `${summary.metrics.outstandingBillingInvoices} invoice${summary.metrics.outstandingBillingInvoices === 1 ? "" : "s"} · ${formatCurrency(summary.metrics.outstandingBillingAmount)}`,
@@ -1437,15 +1714,21 @@ function OperationalAlerts({ summary }: { summary: DashboardSummary | null }) {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="font-semibold text-slate-900">Operational alerts</h3>
-          <p className="mt-1 text-xs text-slate-400">Items that may need attention</p>
+          <p className="mt-1 text-xs text-slate-400">
+            Items that may need attention
+          </p>
         </div>
-        {alerts.length > 0 && <AlertTriangle className="size-4 text-amber-500" />}
+        {alerts.length > 0 && (
+          <AlertTriangle className="size-4 text-amber-500" />
+        )}
       </div>
 
       {alerts.length === 0 ? (
         <div className="mt-6 rounded-xl bg-emerald-50 px-4 py-5 text-center">
           <p className="text-sm font-semibold text-emerald-700">All clear</p>
-          <p className="mt-1 text-xs text-emerald-600">No operational alerts require attention right now.</p>
+          <p className="mt-1 text-xs text-emerald-600">
+            No operational alerts require attention right now.
+          </p>
         </div>
       ) : (
         <div className="mt-5 space-y-3">
@@ -1453,13 +1736,23 @@ function OperationalAlerts({ summary }: { summary: DashboardSummary | null }) {
             const Icon = alert.icon;
 
             return (
-              <Link key={alert.label} to={alert.href} className="group flex items-start gap-3 rounded-xl bg-slate-50 p-4 transition-colors hover:bg-slate-100">
-                <div className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${toneClasses[alert.tone]}`}>
+              <Link
+                key={alert.label}
+                to={alert.href}
+                className="group flex items-start gap-3 rounded-xl bg-slate-50 p-4 transition-colors hover:bg-slate-100"
+              >
+                <div
+                  className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${toneClasses[alert.tone]}`}
+                >
                   <Icon className="size-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-slate-800">{alert.label}</p>
-                  <p className="mt-0.5 text-xs leading-5 text-slate-500">{alert.description}</p>
+                  <p className="text-sm font-semibold text-slate-800">
+                    {alert.label}
+                  </p>
+                  <p className="mt-0.5 text-xs leading-5 text-slate-500">
+                    {alert.description}
+                  </p>
                 </div>
                 <ArrowRight className="mt-1 size-4 shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-teal-500" />
               </Link>
@@ -1489,8 +1782,10 @@ function formatRelativeTime(value: string) {
 
 function QuickActions({
   permissions,
+  onBookAppointment,
 }: {
   permissions: DashboardSummary["permissions"] | undefined;
+  onBookAppointment: () => void;
 }) {
   const actions = [
     {
@@ -1503,8 +1798,9 @@ function QuickActions({
     {
       label: "Book appointment",
       description: "Schedule a visit",
-      href: "/appointments",
+      href: "#book-appointment",
       icon: CalendarDays,
+      onClick: onBookAppointment,
       visible: permissions?.appointments ?? false,
     },
     {
@@ -1550,19 +1846,8 @@ function QuickActions({
         {actions.map((action) => {
           const Icon = action.icon;
 
-          return (
-            <Link
-              key={action.label}
-              to={action.href}
-              className="
-                group
-                rounded-xl
-                bg-slate-50
-                p-4
-                transition-all
-                hover:bg-teal-50
-              "
-            >
+          const content = (
+            <>
               <div
                 className="
                   flex
@@ -1596,6 +1881,32 @@ function QuickActions({
                   group-hover:text-teal-500
                 "
               />
+            </>
+          );
+
+          return action.onClick ? (
+            <button
+              key={action.label}
+              type="button"
+              onClick={action.onClick}
+              className="group w-full rounded-xl bg-slate-50 p-4 text-left transition-all hover:bg-teal-50"
+            >
+              {content}
+            </button>
+          ) : (
+            <Link
+              key={action.label}
+              to={action.href}
+              className="
+                group
+                rounded-xl
+                bg-slate-50
+                p-4
+                transition-all
+                hover:bg-teal-50
+              "
+            >
+              {content}
             </Link>
           );
         })}

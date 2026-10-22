@@ -29,7 +29,7 @@ import { PermissionsGuard } from '../auth/guards/permissions.guard';
 interface AuthenticatedRequest extends Request {
   user: {
     clinicId: string;
-    userId: string;
+    id: string;
   };
 }
 
@@ -42,11 +42,7 @@ export class AppointmentsController {
   @Post()
   @Permissions(PermissionCodes.APPOINTMENT_CREATE)
   create(@Req() req: AuthenticatedRequest, @Body() dto: CreateAppointmentDto) {
-    return this.appointmentsService.create(
-      req.user.clinicId,
-      dto,
-      req.user.userId,
-    );
+    return this.appointmentsService.create(req.user.clinicId, dto, req.user.id);
   }
 
   @Get()
@@ -55,7 +51,11 @@ export class AppointmentsController {
     @Req() req: AuthenticatedRequest,
     @Query() query: AppointmentQueryDto,
   ) {
-    return this.appointmentsService.findAll(req.user.clinicId, query);
+    return this.appointmentsService.findAll(
+      req.user.clinicId,
+      query,
+      req.user.id,
+    );
   }
 
   @Get('availability')
@@ -64,77 +64,91 @@ export class AppointmentsController {
     @Req() req: AuthenticatedRequest,
     @Query() query: AppointmentAvailabilityQueryDto,
   ) {
-    return this.appointmentsService.getAvailability(req.user.clinicId, query);
+    return this.appointmentsService.getAvailability(
+      req.user.clinicId,
+      query,
+      req.user.id,
+    );
   }
 
   @Get(':id')
   @Permissions(PermissionCodes.APPOINTMENT_READ)
-  findOne(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
-    return this.appointmentsService.findOne(req.user.clinicId, id);
+  findOne(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.appointmentsService.findOne(req.user.clinicId, id, req.user.id);
   }
 
   @Patch(':id')
   @Permissions(PermissionCodes.APPOINTMENT_UPDATE)
   update(
     @Req() req: AuthenticatedRequest,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateAppointmentDto,
   ) {
     return this.appointmentsService.update(
       req.user.clinicId,
       id,
       dto,
-      req.user.userId,
+      req.user.id,
     );
   }
 
   @Post(':id/confirm')
   @Permissions(PermissionCodes.APPOINTMENT_UPDATE)
-  confirm(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
-    return this.appointmentsService.confirm(
-      req.user.clinicId,
-      id,
-      req.user.userId,
-    );
+  confirm(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.appointmentsService.confirm(req.user.clinicId, id, req.user.id);
   }
 
   @Post(':id/check-in')
   @Permissions(PermissionCodes.APPOINTMENT_UPDATE)
-  checkIn(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
-    return this.appointmentsService.checkIn(
-      req.user.clinicId,
-      id,
-      req.user.userId,
-    );
+  checkIn(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.appointmentsService.checkIn(req.user.clinicId, id, req.user.id);
   }
 
   @Post(':id/start')
   @Permissions(PermissionCodes.CONSULTATION_START)
-  startConsultation(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+  startConsultation(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     return this.appointmentsService.startConsultation(
       req.user.clinicId,
       id,
-      req.user.userId,
+      req.user.id,
     );
   }
 
   @Post(':id/complete')
   @Permissions(PermissionCodes.APPOINTMENT_UPDATE)
-  complete(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+  complete(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     return this.appointmentsService.complete(
       req.user.clinicId,
       id,
-      req.user.userId,
+      req.user.id,
     );
   }
 
   @Post(':id/no-show')
   @Permissions(PermissionCodes.APPOINTMENT_UPDATE)
-  markNoShow(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+  markNoShow(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     return this.appointmentsService.markNoShow(
       req.user.clinicId,
       id,
-      req.user.userId,
+      req.user.id,
     );
   }
 
@@ -142,14 +156,14 @@ export class AppointmentsController {
   @Permissions(PermissionCodes.APPOINTMENT_CANCEL)
   cancel(
     @Req() req: AuthenticatedRequest,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body('reason') reason?: string,
   ) {
     return this.appointmentsService.cancel(
       req.user.clinicId,
       id,
       reason,
-      req.user.userId,
+      req.user.id,
     );
   }
 
@@ -165,22 +179,17 @@ export class AppointmentsController {
     description: 'Consultation summary retrieved successfully.',
     type: ConsultationSummaryResponseDto,
   })
-  @ApiResponse({
-    status: 401,
-    description: 'Authentication required.',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Insufficient permissions.',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Appointment not found.',
-  })
+  @ApiResponse({ status: 401, description: 'Authentication required.' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions.' })
+  @ApiResponse({ status: 404, description: 'Appointment not found.' })
   getConsultation(
     @Req() req: AuthenticatedRequest,
-    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ConsultationSummaryResponseDto> {
-    return this.appointmentsService.getConsultation(req.user.clinicId, id);
+    return this.appointmentsService.getConsultation(
+      req.user.clinicId,
+      id,
+      req.user.id,
+    );
   }
 }

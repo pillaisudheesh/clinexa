@@ -93,7 +93,10 @@ export class CreateDoctorDto {
   @Min(0)
   teleConsultationFee?: number;
 
-  @ApiPropertyOptional({ type: [Number], description: 'Weekdays: Sunday=0 through Saturday=6' })
+  @ApiPropertyOptional({
+    type: [Number],
+    description: 'Weekdays: Sunday=0 through Saturday=6',
+  })
   @IsOptional()
   @IsArray()
   @IsInt({ each: true })

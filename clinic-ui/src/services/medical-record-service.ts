@@ -10,6 +10,8 @@ export const medicalRecordService = {
   async getMedicalRecords(
     appointmentId?: string,
     patientId?: string,
+    page = 1,
+    limit = 10,
   ): Promise<{
     data: MedicalRecord[];
     meta: {
@@ -23,6 +25,8 @@ export const medicalRecordService = {
       params: {
         ...(appointmentId && { appointmentId }),
         ...(patientId && { patientId }),
+        page,
+        limit,
       },
     });
 

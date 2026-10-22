@@ -2,9 +2,13 @@ import {
   Check,
   ChevronDown,
   Edit3,
+  Filter,
   Loader2,
+  Pill,
   Plus,
   Search,
+  ChevronLeft,
+  ChevronRight,
   ToggleLeft,
   ToggleRight,
   X,
@@ -71,11 +75,13 @@ export function MedicinesPage() {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"all" | "active" | "inactive">("active");
-  const [statusOpen, setStatusOpen] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CreateMedicineRequest>(emptyForm);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
   const loadMedicines = async () => {
     try {
@@ -104,6 +110,7 @@ export function MedicinesPage() {
   };
 
   useEffect(() => {
+    setPage(1);
     const timer = window.setTimeout(() => {
       void loadMedicines();
     }, 250);
@@ -235,10 +242,25 @@ export function MedicinesPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight text-slate-800">
-            Medicines
-          </h2>
-          <p className="mt-1 text-sm text-slate-400">
+          <div className="flex items-center gap-3">
+            <span
+              className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-600"
+              aria-hidden="true"
+            >
+              <Pill className="size-5" strokeWidth={1.8} />
+            </span>
+            <div className="flex min-w-0 items-center gap-2">
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+                Medicines
+              </h1>
+              {medicines.length > 0 && (
+                <span className="rounded-full bg-teal-50 px-2.5 py-1 text-[11px] font-semibold text-teal-700">
+                  {medicines.length}
+                </span>
+              )}
+            </div>
+          </div>
+          <p className="mt-1 text-sm text-slate-500">
             Manage the medicine catalogue used for prescriptions.
           </p>
         </div>
@@ -247,7 +269,7 @@ export function MedicinesPage() {
           <button
             type="button"
             onClick={openCreate}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-700 sm:w-auto"
+            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-teal-600 px-4 text-sm font-semibold text-white shadow-sm transition-all hover:bg-teal-700 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-teal-500/30 sm:w-auto"
           >
             <Plus size={16} />
             Add medicine
@@ -256,7 +278,7 @@ export function MedicinesPage() {
       </div>
 
       {error && (
-        <div className="flex items-center justify-between rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600 !border !border-red-100">
+        <div className="flex items-center justify-between gap-4 rounded-2xl bg-red-50 px-5 py-4 text-sm text-red-700 ring-1 ring-red-100">
           <span>{error}</span>
           <button
             type="button"
@@ -269,7 +291,7 @@ export function MedicinesPage() {
       )}
 
       {formOpen && (
-        <div className="rounded-2xl bg-white p-5 shadow-sm !border !border-slate-100 sm:p-6">
+        <div className="rounded-2xl bg-white p-5 shadow-[0_8px_30px_rgba(15,23,42,0.045)] ring-1 ring-slate-200/60 sm:p-6">
           <div className="mb-5 flex items-start justify-between">
             <div>
               <h3 className="text-sm font-semibold text-slate-700">
@@ -365,7 +387,7 @@ export function MedicinesPage() {
               type="button"
               onClick={closeForm}
               disabled={saving}
-              className="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-500 shadow-sm !border !border-slate-100 transition hover:bg-slate-50 hover:text-slate-700"
+              className="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-500 ring-1 ring-slate-200/70 transition hover:bg-slate-50 hover:text-slate-700"
             >
               Cancel
             </button>
@@ -387,93 +409,347 @@ export function MedicinesPage() {
         </div>
       )}
 
-      <div className="rounded-2xl bg-white p-4 shadow-sm !border !border-slate-100 sm:p-5">
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <div className="relative flex-1">
+      <section className="rounded-2xl bg-white p-4 shadow-[0_8px_30px_rgba(15,23,42,0.045)] ring-1 ring-slate-200/60 sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative min-w-0 flex-1">
             <Search
-              size={16}
+              size={17}
               className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
             />
             <input
+              type="text"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search medicines..."
-              className="w-full rounded-xl bg-white py-3 pl-10 pr-4 text-sm text-slate-700 outline-none shadow-[inset_0_0_0_1px_rgba(226,232,240,0.95)] transition placeholder:text-slate-300 focus:bg-white focus:ring-2 focus:ring-teal-50"
+              placeholder="Search by medicine, generic name or manufacturer"
+              className="h-11 w-full rounded-xl bg-slate-50/70 pl-10 pr-10 text-sm text-slate-700 outline-none ring-1 ring-slate-200/60 transition-all placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-teal-500/20"
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                aria-label="Clear search"
+                className="absolute right-3 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
-
-          <CustomSelect
-            value={status}
-            options={["all", "active", "inactive"]}
-            displayOptions={{
-              all: "All medicines",
-              active: "Active",
-              inactive: "Inactive",
-            }}
-            placeholder="Status"
-            onChange={(value) =>
-              setStatus(value as "all" | "active" | "inactive")
-            }
-            compact
-          />
+          <button
+            type="button"
+            onClick={() => setShowFilters((current) => !current)}
+            className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium transition-colors ${showFilters ? "bg-teal-50 text-teal-700" : "bg-slate-50 text-slate-500 hover:bg-slate-100"}`}
+          >
+            <Filter size={16} /> Filters{" "}
+            <ChevronDown
+              size={15}
+              className={`transition-transform ${showFilters ? "rotate-180" : ""}`}
+            />
+          </button>
         </div>
-      </div>
-
-      {loading ? (
-        <div className="flex min-h-56 items-center justify-center rounded-2xl bg-white shadow-sm !border !border-slate-100">
-          <div className="flex items-center gap-2 text-sm text-slate-400">
-            <Loader2 size={17} className="animate-spin" />
-            Loading medicines...
+        {showFilters && (
+          <div className="relative mt-4 flex flex-wrap items-center gap-2 border-0 pt-4 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-slate-100">
+            <span className="mr-1 text-xs font-medium text-slate-400">
+              Status
+            </span>
+            {(
+              [
+                ["all", "All"],
+                ["active", "Active"],
+                ["inactive", "Inactive"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setStatus(value)}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${status === value ? "bg-teal-50 text-teal-700" : "bg-slate-50 text-slate-500 hover:bg-slate-100"}`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-        </div>
-      ) : medicines.length === 0 ? (
-        <div className="flex min-h-56 flex-col items-center justify-center rounded-2xl bg-white px-6 text-center shadow-sm !border !border-slate-100">
-          <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-teal-50 text-teal-600">
-            <Plus size={18} />
-          </div>
-          <h3 className="text-sm font-semibold text-slate-700">
-            No medicines found
-          </h3>
-          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-400">
-            {search
-              ? "Try a different search term."
-              : "Add your first medicine to make it available for prescriptions."}
-          </p>
+        )}
+      </section>
 
-          {canCreate && !search && status !== "inactive" && (
-            <button
-              type="button"
-              onClick={openCreate}
-              className="mt-4 rounded-xl bg-teal-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-teal-700"
-            >
-              Add medicine
-            </button>
+      <section className="overflow-hidden rounded-2xl bg-white shadow-[0_8px_30px_rgba(15,23,42,0.045)] ring-1 ring-slate-200/60">
+        <div className="flex items-center justify-between px-5 py-5 sm:px-6">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-800">
+              Medicine directory
+            </h2>
+            <p className="mt-1 text-xs text-slate-400">
+              {loading
+                ? "Loading medicines..."
+                : medicines.length === 0
+                  ? "No medicines"
+                  : `Showing ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, medicines.length)} of ${medicines.length}`}
+            </p>
+          </div>
+          {loading && (
+            <div className="flex items-center gap-2 text-xs text-slate-400">
+              <Loader2 className="size-3.5 animate-spin text-teal-500" />{" "}
+              Loading
+            </div>
           )}
         </div>
-      ) : (
-        <div className="space-y-3">
-          {medicines.map((medicine) => (
-            <MedicineCard
-              key={medicine.id}
-              medicine={medicine}
-              canUpdate={canUpdate}
-              onEdit={() => openEdit(medicine)}
-              onToggle={() => void handleToggleStatus(medicine)}
+
+        <div className="hidden overflow-x-auto md:block">
+          <div className="min-w-[1000px] grid grid-cols-[minmax(180px,1.5fr)_minmax(140px,1.15fr)_minmax(120px,1fr)_minmax(76px,0.6fr)_minmax(86px,0.7fr)_minmax(90px,0.7fr)_minmax(104px,0.8fr)] items-center gap-3 bg-slate-50/70 px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 xl:px-6">
+            <span>Medicine</span>
+            <span>Generic / strength</span>
+            <span>Manufacturer</span>
+            <span>Form</span>
+            <span>Status</span>
+            <span className="text-right">Price</span>
+            <span className="text-right">Actions</span>
+          </div>
+          {loading && medicines.length === 0 ? (
+            <div className="space-y-0">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="grid grid-cols-[minmax(180px,1.5fr)_minmax(140px,1.15fr)_minmax(120px,1fr)_minmax(76px,0.6fr)_minmax(86px,0.7fr)_minmax(90px,0.7fr)_minmax(104px,0.8fr)] items-center gap-3 px-5 py-5 xl:px-6"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="size-9 animate-pulse rounded-full bg-slate-100" />
+                    <div className="h-3.5 w-32 animate-pulse rounded bg-slate-100" />
+                  </div>
+                  <div className="h-3.5 w-28 animate-pulse rounded bg-slate-100" />
+                  <div className="h-3.5 w-24 animate-pulse rounded bg-slate-100" />
+                  <div className="h-3.5 w-16 animate-pulse rounded bg-slate-100" />
+                  <div className="h-6 w-16 animate-pulse rounded-full bg-slate-100" />
+                  <div className="h-3.5 w-14 justify-self-end animate-pulse rounded bg-slate-100" />
+                  <div className="h-7 w-20 justify-self-end animate-pulse rounded bg-slate-100" />
+                </div>
+              ))}
+            </div>
+          ) : medicines.length === 0 ? (
+            <MedicineEmptyState
+              search={search}
+              canCreate={canCreate}
+              onCreate={openCreate}
             />
-          ))}
+          ) : (
+            <div>
+              {medicines
+                .slice((page - 1) * pageSize, page * pageSize)
+                .map((medicine, index) => (
+                  <MedicineRow
+                    key={medicine.id}
+                    medicine={medicine}
+                    index={index}
+                    canUpdate={canUpdate}
+                    onEdit={() => openEdit(medicine)}
+                    onToggle={() => void handleToggleStatus(medicine)}
+                  />
+                ))}
+            </div>
+          )}
         </div>
-      )}
+
+        <div className="md:hidden">
+          {loading && medicines.length === 0 ? (
+            <div className="space-y-4 px-5 py-5">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div key={index} className="flex gap-3">
+                  <div className="size-10 animate-pulse rounded-full bg-slate-100" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3.5 w-36 animate-pulse rounded bg-slate-100" />
+                    <div className="h-3 w-24 animate-pulse rounded bg-slate-100" />
+                    <div className="h-3 w-full animate-pulse rounded bg-slate-100" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : medicines.length === 0 ? (
+            <MedicineEmptyState
+              search={search}
+              canCreate={canCreate}
+              onCreate={openCreate}
+            />
+          ) : (
+            <div>
+              {medicines
+                .slice((page - 1) * pageSize, page * pageSize)
+                .map((medicine, index) => (
+                  <MedicineMobileCard
+                    key={medicine.id}
+                    medicine={medicine}
+                    index={index}
+                    canUpdate={canUpdate}
+                    onEdit={() => openEdit(medicine)}
+                    onToggle={() => void handleToggleStatus(medicine)}
+                  />
+                ))}
+            </div>
+          )}
+        </div>
+
+        {medicines.length > 0 && (
+          <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <p className="text-xs text-slate-400">
+              Showing{" "}
+              <span className="font-medium text-slate-600">
+                {(page - 1) * pageSize + 1}
+              </span>
+              –
+              <span className="font-medium text-slate-600">
+                {Math.min(page * pageSize, medicines.length)}
+              </span>{" "}
+              of{" "}
+              <span className="font-medium text-slate-600">
+                {medicines.length}
+              </span>
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={page <= 1 || loading}
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                className="flex size-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-30"
+                aria-label="Previous page"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span className="min-w-16 text-center text-xs font-medium text-slate-500">
+                {page} / {Math.max(Math.ceil(medicines.length / pageSize), 1)}
+              </span>
+              <button
+                type="button"
+                disabled={
+                  page >= Math.ceil(medicines.length / pageSize) || loading
+                }
+                onClick={() =>
+                  setPage((current) =>
+                    Math.min(
+                      Math.ceil(medicines.length / pageSize),
+                      current + 1,
+                    ),
+                  )
+                }
+                className="flex size-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-30"
+                aria-label="Next page"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
 
-function MedicineCard({
+function MedicineRow({
   medicine,
+  index,
   canUpdate,
   onEdit,
   onToggle,
 }: {
   medicine: Medicine;
+  index: number;
+  canUpdate: boolean;
+  onEdit: () => void;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="group relative min-w-[1000px] border-0 transition-colors duration-150 hover:bg-slate-50/60">
+      {index > 0 && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-px"
+          style={{ backgroundColor: "#e5e7eb" }}
+        />
+      )}
+      <div className="grid grid-cols-[minmax(180px,1.5fr)_minmax(140px,1.15fr)_minmax(120px,1fr)_minmax(76px,0.6fr)_minmax(86px,0.7fr)_minmax(90px,0.7fr)_minmax(104px,0.8fr)] items-center gap-3 px-5 py-4 xl:px-6">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-teal-50 text-teal-700">
+            <Pill size={17} />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-slate-700">
+              {medicine.name}
+            </p>
+            <p className="mt-1 truncate text-[11px] text-slate-400">
+              {medicine.category || medicine.unit || "Medicine"}
+            </p>
+          </div>
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-sm text-slate-600">
+            {medicine.genericName || "—"}
+          </p>
+          <p className="mt-1 truncate text-[11px] text-slate-400">
+            {medicine.strength || "Strength not set"}
+          </p>
+        </div>
+        <p className="truncate text-sm text-slate-600">
+          {medicine.manufacturer || "—"}
+        </p>
+        <p className="truncate text-sm text-slate-600">
+          {medicine.form || "—"}
+        </p>
+        <span
+          className={`w-fit whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-semibold ${medicine.isActive ? "bg-teal-50 text-teal-700" : "bg-slate-100 text-slate-500"}`}
+        >
+          {medicine.isActive ? "Active" : "Inactive"}
+        </span>
+        <span className="text-right text-sm font-semibold tabular-nums text-slate-700">
+          ₹{Number(medicine.price).toFixed(2)}
+        </span>
+        <div className="flex items-center justify-end gap-1">
+          {canUpdate ? (
+            <>
+              <button
+                type="button"
+                onClick={onEdit}
+                className="flex size-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                aria-label={`Edit ${medicine.name}`}
+                title="Edit medicine"
+              >
+                <Edit3 size={15} />
+              </button>
+              <button
+                type="button"
+                onClick={onToggle}
+                className="flex size-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                aria-label={
+                  medicine.isActive
+                    ? `Deactivate ${medicine.name}`
+                    : `Activate ${medicine.name}`
+                }
+                title={
+                  medicine.isActive
+                    ? "Deactivate medicine"
+                    : "Activate medicine"
+                }
+              >
+                {medicine.isActive ? (
+                  <ToggleRight size={18} />
+                ) : (
+                  <ToggleLeft size={18} />
+                )}
+              </button>
+            </>
+          ) : (
+            <span className="text-xs text-slate-300">—</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MedicineMobileCard({
+  medicine,
+  index,
+  canUpdate,
+  onEdit,
+  onToggle,
+}: {
+  medicine: Medicine;
+  index: number;
   canUpdate: boolean;
   onEdit: () => void;
   onToggle: () => void;
@@ -484,60 +760,58 @@ function MedicineCard({
     medicine.form,
     medicine.unit,
   ].filter(Boolean);
-
   return (
-    <div className="rounded-2xl bg-white p-4 shadow-sm !border !border-slate-100 sm:p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-sm font-semibold text-slate-700">
-              {medicine.name}
-            </h3>
-
-            <span
-              className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
-                medicine.isActive
-                  ? "bg-teal-50 text-teal-700"
-                  : "bg-slate-100 text-slate-500"
-              }`}
-            >
-              {medicine.isActive ? "Active" : "Inactive"}
-            </span>
-          </div>
-
-          {details.length > 0 && (
-            <p className="mt-1.5 text-xs leading-5 text-slate-500">
-              {details.join(" · ")}
-            </p>
-          )}
-
-          {medicine.manufacturer && (
-            <p className="mt-1 text-xs text-slate-400">
-              {medicine.manufacturer}
-            </p>
-          )}
+    <div
+      className="relative flex gap-3 border-0 px-5 py-4 transition-colors hover:bg-slate-50/60"
+      style={{ borderTop: "0", borderBottom: "0" }}
+    >
+      {index > 0 && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-px"
+          style={{ backgroundColor: "rgba(226, 232, 240, 0.6)" }}
+        />
+      )}
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-teal-50 text-teal-700">
+        <Pill size={18} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="truncate text-sm font-semibold text-slate-700">
+            {medicine.name}
+          </p>
+          <span
+            className={`rounded-full px-2 py-1 text-[10px] font-semibold ${medicine.isActive ? "bg-teal-50 text-teal-700" : "bg-slate-100 text-slate-500"}`}
+          >
+            {medicine.isActive ? "Active" : "Inactive"}
+          </span>
         </div>
-
-        <div className="flex shrink-0 items-center gap-1">
-          <span className="mr-1 text-sm font-semibold text-slate-700">
+        <p className="mt-1 text-xs leading-5 text-slate-500">
+          {details.length
+            ? details.join(" · ")
+            : medicine.category || "Medicine details not set"}
+        </p>
+        <p className="mt-1 text-xs text-slate-400">
+          {medicine.manufacturer || "Manufacturer not set"}
+        </p>
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <span className="text-sm font-semibold text-slate-700">
             ₹{Number(medicine.price).toFixed(2)}
           </span>
-
           {canUpdate && (
-            <>
+            <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={onEdit}
-                className="flex size-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-50 hover:text-slate-700"
+                className="flex size-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
                 aria-label={`Edit ${medicine.name}`}
               >
                 <Edit3 size={15} />
               </button>
-
               <button
                 type="button"
                 onClick={onToggle}
-                className="flex size-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-50 hover:text-slate-700"
+                className="flex size-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
                 aria-label={
                   medicine.isActive
                     ? `Deactivate ${medicine.name}`
@@ -550,10 +824,45 @@ function MedicineCard({
                   <ToggleLeft size={18} />
                 )}
               </button>
-            </>
+            </div>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function MedicineEmptyState({
+  search,
+  canCreate,
+  onCreate,
+}: {
+  search: string;
+  canCreate: boolean;
+  onCreate: () => void;
+}) {
+  return (
+    <div className="flex min-h-56 flex-col items-center justify-center px-6 py-10 text-center">
+      <div className="mb-3 flex size-11 items-center justify-center rounded-full bg-teal-50 text-teal-700">
+        <Pill size={19} />
+      </div>
+      <h3 className="text-sm font-semibold text-slate-700">
+        No medicines found
+      </h3>
+      <p className="mt-1 max-w-sm text-xs leading-5 text-slate-400">
+        {search
+          ? "Try a different search term."
+          : "Add your first medicine to make it available for prescriptions."}
+      </p>
+      {canCreate && !search && (
+        <button
+          type="button"
+          onClick={onCreate}
+          className="mt-4 rounded-xl bg-teal-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-teal-700"
+        >
+          Add medicine
+        </button>
+      )}
     </div>
   );
 }
@@ -586,7 +895,7 @@ function Field({
         disabled={disabled}
         min={type === "number" ? 0 : undefined}
         step={type === "number" ? "0.01" : undefined}
-        className="w-full rounded-xl bg-white px-3.5 py-3 text-sm text-slate-700 outline-none shadow-[inset_0_0_0_1px_rgba(226,232,240,0.95)] transition placeholder:text-slate-300 focus:ring-2 focus:ring-teal-50 disabled:bg-slate-50 disabled:text-slate-400"
+        className="w-full rounded-xl bg-white px-3.5 py-3 text-sm text-slate-700 outline-none shadow-[inset_0_0_0_1px_rgba(226,232,240,0.95)] transition placeholder:text-slate-300 focus:ring-2 focus:ring-teal-500/20 disabled:bg-slate-50 disabled:text-slate-400"
       />
     </div>
   );

@@ -20,14 +20,38 @@ export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getSummary(clinicId: string, userId: string) {
-    const [permissions, clinic] = await Promise.all([
-      this.getUserPermissions(clinicId, userId),
-      this.prisma.clinic.findUnique({ where: { id: clinicId }, select: { timezone: true } }),
+    const [userAccess, clinic] = await Promise.all([
+      this.getUserAccess(clinicId, userId),
+      this.prisma.clinic.findUnique({
+        where: { id: clinicId },
+        select: { timezone: true },
+      }),
     ]);
+
+    const { permissions, isDoctor } = userAccess;
+
+    // A Doctor's appointment data must be limited to their linked Doctor profile.
+    // If no profile is linked, appointment queries below deliberately return no rows.
+    const linkedDoctor = isDoctor
+      ? await this.prisma.doctor.findFirst({
+          where: { clinicId, userId },
+          select: { id: true },
+        })
+      : null;
+
+    const doctorAppointmentScope = isDoctor
+      ? linkedDoctor
+        ? { doctorId: linkedDoctor.id }
+        : { doctorId: { in: [] as string[] } }
+      : {};
+
     const timezone = clinic?.timezone || 'UTC';
     const todayKey = dateKeyInTimezone(new Date(), timezone);
     const startOfToday = startOfDateInTimezone(todayKey, timezone);
-    const startOfTomorrow = startOfDateInTimezone(addCalendarDays(todayKey, 1), timezone);
+    const startOfTomorrow = startOfDateInTimezone(
+      addCalendarDays(todayKey, 1),
+      timezone,
+    );
     const appointmentDateRange = dateOnlyUtcRange(todayKey);
 
     const can = (permission: string) => permissions.has(permission);
@@ -65,6 +89,7 @@ export class DashboardService {
         ? this.prisma.appointment.findMany({
             where: {
               clinicId,
+              ...doctorAppointmentScope,
               appointmentDate: {
                 gte: appointmentDateRange.from,
                 lt: appointmentDateRange.to,
@@ -176,10 +201,7 @@ export class DashboardService {
             where: {
               clinicId,
               status: {
-                in: [
-                  InvoiceStatus.ISSUED,
-                  InvoiceStatus.PARTIALLY_PAID,
-                ],
+                in: [InvoiceStatus.ISSUED, InvoiceStatus.PARTIALLY_PAID],
               },
               balanceDue: {
                 gt: 0,
@@ -211,7 +233,10 @@ export class DashboardService {
           : [],
         can(PermissionCodes.APPOINTMENT_READ)
           ? this.prisma.appointment.findMany({
-              where: { clinicId },
+              where: {
+                clinicId,
+                ...doctorAppointmentScope,
+              },
               orderBy: { createdAt: 'desc' },
               take: 4,
               select: {
@@ -276,7 +301,13 @@ export class DashboardService {
       ]),
     ]);
 
-    const [activityPatients, activityAppointments, activityPayments, activityLabs, activityInventory] = recentActivitySources;
+    const [
+      activityPatients,
+      activityAppointments,
+      activityPayments,
+      activityLabs,
+      activityInventory,
+    ] = recentActivitySources;
 
     const recentActivity = [
       ...activityPatients.map((item) => ({
@@ -323,6 +354,7 @@ export class DashboardService {
           by: ['status'],
           where: {
             clinicId,
+            ...doctorAppointmentScope,
             appointmentDate: {
               gte: appointmentDateRange.from,
               lt: appointmentDateRange.to,
@@ -345,9 +377,8 @@ export class DashboardService {
           : null,
         pendingLabOrders,
         lowStockBatches: lowStockRows
-          ? lowStockRows.filter(
-              (batch) => batch.quantity <= batch.reorderLevel,
-            ).length
+          ? lowStockRows.filter((batch) => batch.quantity <= batch.reorderLevel)
+              .length
           : null,
         collectedRevenue: revenue?._sum.amount
           ? Number(revenue._sum.amount)
@@ -412,10 +443,10 @@ export class DashboardService {
     };
   }
 
-  private async getUserPermissions(
+  private async getUserAccess(
     clinicId: string,
     userId: string,
-  ): Promise<Set<string>> {
+  ): Promise<{ permissions: Set<string>; isDoctor: boolean }> {
     const roles = await this.prisma.userRole.findMany({
       where: {
         userId,
@@ -427,6 +458,8 @@ export class DashboardService {
       select: {
         role: {
           select: {
+            code: true,
+            name: true,
             permissions: {
               select: {
                 permission: {
@@ -441,14 +474,24 @@ export class DashboardService {
       },
     });
 
-    const result = new Set<string>();
+    const permissions = new Set<string>();
+    let isDoctor = false;
 
     for (const userRole of roles) {
-      for (const rolePermission of userRole.role.permissions) {
-        result.add(rolePermission.permission.code);
+      const role = userRole.role;
+
+      if (
+        role.code?.toUpperCase() === 'DOCTOR' ||
+        role.name?.toLowerCase() === 'doctor'
+      ) {
+        isDoctor = true;
+      }
+
+      for (const rolePermission of role.permissions) {
+        permissions.add(rolePermission.permission.code);
       }
     }
 
-    return result;
+    return { permissions, isDoctor };
   }
 }

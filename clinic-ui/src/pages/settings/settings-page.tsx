@@ -13,7 +13,10 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "@/auth/auth-context";
-import { settingsService, type RolePermissionRecord } from "@/services/settings-service";
+import {
+  settingsService,
+  type RolePermissionRecord,
+} from "@/services/settings-service";
 
 type Tab = "users" | "roles";
 type PageResult<T> = {
@@ -32,6 +35,23 @@ type UserRecord = {
   status: "ACTIVE" | "INACTIVE" | "LOCKED";
   roles: string[];
   createdAt: string;
+  doctorProfile?: {
+    id: string;
+    doctorNumber: string;
+    title: string;
+    firstName: string;
+    lastName: string;
+  } | null;
+};
+type DoctorRecord = {
+  id: string;
+  doctorNumber: string;
+  title: string;
+  firstName: string;
+  middleName: string | null;
+  lastName: string;
+  department?: { name: string } | null;
+  primarySpecialty?: { name: string } | null;
 };
 type ClinicRecord = {
   id: string;
@@ -57,6 +77,17 @@ type PermissionRecord = {
   description: string | null;
   permissionGroup?: { id: string; code: string; name: string };
 };
+
+export interface AvailableDoctorRecord {
+  id: string;
+  doctorNumber: string;
+  title: string;
+  firstName: string;
+  middleName: string | null;
+  lastName: string;
+  department?: { name: string } | null;
+  primarySpecialty?: { name: string } | null;
+}
 const inputClass =
   "h-10 w-full rounded-xl bg-slate-50 px-3 text-sm text-slate-700 outline-none ring-1 ring-slate-200 placeholder:text-slate-400 focus:bg-white focus:ring-teal-500/40";
 const primaryClass =
@@ -130,6 +161,8 @@ export function SettingsPage() {
   const [clinics, setClinics] = useState<ClinicRecord[]>([]);
   const [selectedClinicId, setSelectedClinicId] = useState("");
   const [loadingClinics, setLoadingClinics] = useState(false);
+  const [availableDoctors, setAvailableDoctors] = useState<DoctorRecord[]>([]);
+  const [loadingDoctors, setLoadingDoctors] = useState(false);
   const [permissions, setPermissions] = useState<PermissionRecord[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -150,6 +183,7 @@ export function SettingsPage() {
     email: "",
     password: "",
     roleIds: [] as string[],
+    doctorId: "",
   });
   const [roleForm, setRoleForm] = useState({
     code: "",
@@ -165,13 +199,19 @@ export function SettingsPage() {
           setUsers([]);
           return;
         }
-        const userResult = await settingsService.getUsers(
-          { page, limit: 10, search: search.trim() || undefined },
-        );
+        const userResult = await settingsService.getUsers({
+          page,
+          limit: 10,
+          search: search.trim() || undefined,
+        });
         setUsers(userResult.data.data);
         setTotalPages(userResult.data.totalPages || 1);
         if (canManageRoles) {
-          const roleResult = await settingsService.getRoles({ page: 1, limit: 100, sortBy: "displayOrder" });
+          const roleResult = await settingsService.getRoles({
+            page: 1,
+            limit: 100,
+            sortBy: "displayOrder",
+          });
           setRoles(roleResult.data.data);
         }
       } else {
@@ -181,9 +221,16 @@ export function SettingsPage() {
         }
         const [roleResult, permissionResult] = await Promise.all([
           settingsService.getRoles({
-            page, limit: 10, search: search.trim() || undefined, sortBy: "displayOrder",
+            page,
+            limit: 10,
+            search: search.trim() || undefined,
+            sortBy: "displayOrder",
           }),
-          settingsService.getPermissions({ page: 1, limit: 200, sortBy: "name" }),
+          settingsService.getPermissions({
+            page: 1,
+            limit: 200,
+            sortBy: "name",
+          }),
         ]);
         setRoles(roleResult.data.data);
         setPermissions(permissionResult.data.data);
@@ -201,6 +248,55 @@ export function SettingsPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const doctorRoleSelected = userForm.roleIds.some((roleId) => {
+    const role = roles.find((item) => item.id === roleId);
+    return (
+      role?.code
+        .trim()
+        .toUpperCase()
+        .replace(/[\s-]+/g, "_") === "DOCTOR"
+    );
+  });
+
+  useEffect(() => {
+    if (!showUserForm || !doctorRoleSelected || !selectedClinicId) {
+      setAvailableDoctors([]);
+      setLoadingDoctors(false);
+      setUserForm((current) => ({ ...current, doctorId: "" }));
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingDoctors(true);
+    setAvailableDoctors([]);
+    setUserForm((current) => ({ ...current, doctorId: "" }));
+
+    settingsService
+      .getAvailableDoctors(selectedClinicId)
+      .then((response) => {
+        if (!cancelled) setAvailableDoctors(response.data ?? []);
+      })
+      .catch((requestError: any) => {
+        if (cancelled) return;
+        console.error(
+          "Unable to load available doctor profiles.",
+          requestError,
+        );
+        setAvailableDoctors([]);
+        setError(
+          requestError?.response?.data?.message?.toString() ||
+            "Unable to load available doctor profiles for the selected clinic.",
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingDoctors(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showUserForm, doctorRoleSelected, selectedClinicId]);
 
   // Clinic list and lifecycle permissions are platform-only. Do not expose them as
   // assignable role permissions; the API also rejects them defensively.
@@ -235,6 +331,7 @@ export function SettingsPage() {
       email: "",
       password: "",
       roleIds: [],
+      doctorId: "",
     });
     setSelectedClinicId(isPlatformAdmin ? "" : (user?.clinicId ?? ""));
     setShowUserForm(true);
@@ -253,7 +350,12 @@ export function SettingsPage() {
     try {
       let availableClinics: ClinicRecord[] = [];
       if (isPlatformAdmin) {
-        const clinicResult = await settingsService.getClinics({ page: 1, limit: 100, sortBy: "name", sortOrder: "asc" });
+        const clinicResult = await settingsService.getClinics({
+          page: 1,
+          limit: 100,
+          sortBy: "name",
+          sortOrder: "asc",
+        });
         availableClinics = (clinicResult.data.data ?? []).filter(
           (clinic) => clinic.isActive,
         );
@@ -261,7 +363,12 @@ export function SettingsPage() {
         const initialClinicId = availableClinics[0]?.id ?? "";
         setSelectedClinicId(initialClinicId);
         if (initialClinicId) {
-          const roleResult = await settingsService.getRoles({ page: 1, limit: 100, sortBy: "displayOrder", clinicId: initialClinicId });
+          const roleResult = await settingsService.getRoles({
+            page: 1,
+            limit: 100,
+            sortBy: "displayOrder",
+            clinicId: initialClinicId,
+          });
           setRoles(roleResult.data.data ?? []);
         } else {
           setRoles([]);
@@ -276,7 +383,11 @@ export function SettingsPage() {
             "Your account is not associated with a clinic. Contact your administrator.",
           );
         }
-        const roleResult = await settingsService.getRoles({ page: 1, limit: 100, sortBy: "displayOrder" });
+        const roleResult = await settingsService.getRoles({
+          page: 1,
+          limit: 100,
+          sortBy: "displayOrder",
+        });
         setRoles(roleResult.data.data ?? []);
       }
     } catch (requestError: any) {
@@ -303,7 +414,12 @@ export function SettingsPage() {
     setLoadingRoles(true);
     setError(null);
     try {
-      const roleResult = await settingsService.getRoles({ page: 1, limit: 100, sortBy: "displayOrder", clinicId });
+      const roleResult = await settingsService.getRoles({
+        page: 1,
+        limit: 100,
+        sortBy: "displayOrder",
+        clinicId,
+      });
       setRoles(roleResult.data.data ?? []);
     } catch (requestError: any) {
       console.error("Unable to load roles for selected clinic.", requestError);
@@ -332,10 +448,12 @@ export function SettingsPage() {
     setError(null);
     setNotice(null);
     try {
+      const { doctorId, ...userDetails } = userForm;
       await settingsService.createUser({
-        ...userForm,
+        ...userDetails,
         clinicId,
         roleIds: userForm.roleIds,
+        ...(doctorRoleSelected && doctorId ? { doctorId } : {}),
       });
       setShowUserForm(false);
       setUserForm({
@@ -344,6 +462,7 @@ export function SettingsPage() {
         email: "",
         password: "",
         roleIds: [],
+        doctorId: "",
       });
       setNotice("User created successfully.");
       await load();
@@ -457,7 +576,10 @@ export function SettingsPage() {
     setError(null);
     setNotice(null);
     try {
-      await settingsService.updateRolePermissions(editingRole.id, rolePermissionIds);
+      await settingsService.updateRolePermissions(
+        editingRole.id,
+        rolePermissionIds,
+      );
       setNotice(`Permissions updated for ${editingRole.name}.`);
       setEditingRole(null);
       await load();
@@ -617,6 +739,14 @@ export function SettingsPage() {
                       <p className="mt-1 break-all text-xs text-slate-500">
                         {record.email}
                       </p>
+                      {record.doctorProfile && (
+                        <p className="mt-1 text-xs text-teal-700">
+                          Doctor: {record.doctorProfile.title}{" "}
+                          {record.doctorProfile.firstName}{" "}
+                          {record.doctorProfile.lastName} ·{" "}
+                          {record.doctorProfile.doctorNumber}
+                        </p>
+                      )}
                     </div>
                     <StatusPill active={record.status === "ACTIVE"}>
                       {pretty(record.status)}
@@ -690,6 +820,14 @@ export function SettingsPage() {
                             <p className="mt-0.5 text-xs text-slate-500">
                               {record.email}
                             </p>
+                            {record.doctorProfile && (
+                              <p className="mt-1 text-xs text-teal-700">
+                                Doctor: {record.doctorProfile.title}{" "}
+                                {record.doctorProfile.firstName}{" "}
+                                {record.doctorProfile.lastName} ·{" "}
+                                {record.doctorProfile.doctorNumber}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -1100,6 +1238,51 @@ export function SettingsPage() {
                     </div>
                   )}
               </fieldset>
+              {doctorRoleSelected && (
+                <label className="text-xs font-semibold text-slate-600 sm:col-span-2">
+                  Link doctor profile
+                  <select
+                    value={userForm.doctorId}
+                    onChange={(event) =>
+                      setUserForm((current) => ({
+                        ...current,
+                        doctorId: event.target.value,
+                      }))
+                    }
+                    disabled={
+                      loadingDoctors ||
+                      !selectedClinicId ||
+                      availableDoctors.length === 0
+                    }
+                    className={`${inputClass} mt-1.5`}
+                  >
+                    <option value="">
+                      {loadingDoctors
+                        ? "Loading available doctors…"
+                        : availableDoctors.length === 0
+                          ? "No unlinked active doctor profiles available"
+                          : "Create account without linking a doctor (optional)"}
+                    </option>
+                    {availableDoctors.map((doctor) => (
+                      <option key={doctor.id} value={doctor.id}>
+                        {doctor.title} {doctor.firstName}{" "}
+                        {doctor.middleName ? `${doctor.middleName} ` : ""}
+                        {doctor.lastName} — {doctor.doctorNumber}
+                        {doctor.department?.name
+                          ? ` · ${doctor.department.name}`
+                          : ""}
+                        {doctor.primarySpecialty?.name
+                          ? ` · ${doctor.primarySpecialty.name}`
+                          : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="mt-1 block font-normal text-slate-400">
+                    Link this login to an existing active doctor profile in the
+                    selected clinic. This is optional.
+                  </span>
+                </label>
+              )}
             </div>
             <div className="mt-6 flex justify-end gap-2">
               <button
@@ -1114,6 +1297,7 @@ export function SettingsPage() {
                 disabled={
                   saving ||
                   userForm.roleIds.length === 0 ||
+                  (doctorRoleSelected && loadingDoctors) ||
                   (isPlatformAdmin &&
                     (!selectedClinicId ||
                       loadingClinics ||

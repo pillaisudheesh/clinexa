@@ -1,0 +1,141 @@
+.appointment-calendar .fc {
+  --fc-border-color: #e8edf3;
+  --fc-page-bg-color: #ffffff;
+  --fc-neutral-bg-color: #f8fafc;
+  --fc-today-bg-color: #f0fdfa;
+  --fc-event-border-color: transparent;
+  color: #334155;
+  font-size: 0.8125rem;
+}
+.appointment-calendar .fc .fc-toolbar {
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.appointment-calendar .fc .fc-toolbar-title {
+  color: #0f172a;
+  font-size: 1rem;
+  font-weight: 650;
+}
+.appointment-calendar .fc .fc-button {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.55rem;
+  background: #fff;
+  color: #475569;
+  box-shadow: none;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.4rem 0.65rem;
+  text-transform: none;
+}
+.appointment-calendar .fc .fc-button:hover,
+.appointment-calendar .fc .fc-button:focus {
+  border-color: #99f6e4;
+  background: #f0fdfa;
+  color: #0f766e;
+  box-shadow: none;
+}
+.appointment-calendar .fc .fc-button-primary:not(:disabled).fc-button-active,
+.appointment-calendar .fc .fc-button-primary:not(:disabled):active {
+  border-color: #0d9488;
+  background: #0d9488;
+  color: #fff;
+}
+.appointment-calendar .fc .fc-col-header-cell-cushion {
+  padding: 0.65rem 0.25rem;
+  color: #64748b;
+  font-size: 0.7rem;
+  font-weight: 650;
+  text-decoration: none;
+}
+.appointment-calendar .fc .fc-daygrid-day-number,
+.appointment-calendar .fc .fc-timegrid-slot-label-cushion {
+  color: #64748b;
+  font-size: 0.72rem;
+  text-decoration: none;
+}
+.appointment-calendar .fc .fc-event {
+  border-radius: 0.35rem;
+  padding: 1px 3px;
+  cursor: pointer;
+  font-size: 0.7rem;
+}
+.appointment-calendar .fc .fc-timegrid-event .fc-event-main {
+  padding: 2px 3px;
+}
+.appointment-calendar .fc .fc-daygrid-day-frame {
+  min-height: 5.25rem;
+}
+.appointment-calendar--compact .fc {
+  font-size: 0.7rem;
+}
+.appointment-calendar--compact .fc .fc-toolbar {
+  margin-bottom: 0.75rem;
+}
+.appointment-calendar--compact .fc .fc-toolbar-title {
+  font-size: 0.9rem;
+}
+.appointment-calendar--compact .fc .fc-button {
+  padding: 0.3rem 0.45rem;
+  font-size: 0.68rem;
+}
+.appointment-calendar--compact .fc .fc-daygrid-day-frame {
+  min-height: 2.75rem;
+}
+.appointment-calendar--compact .fc .fc-daygrid-day-number {
+  padding: 0.25rem;
+  font-size: 0.65rem;
+}
+.appointment-calendar--compact .fc .fc-daygrid-event {
+  margin-top: 1px;
+  padding: 0 2px;
+}
+@media (max-width: 640px) {
+  .appointment-calendar .fc .fc-toolbar {
+    align-items: flex-start;
+  }
+  .appointment-calendar .fc .fc-toolbar-title {
+    font-size: 0.9rem;
+  }
+  .appointment-calendar .fc .fc-button {
+    padding: 0.35rem 0.45rem;
+    font-size: 0.68rem;
+  }
+  .appointment-calendar .fc .fc-timegrid-axis,
+  .appointment-calendar .fc .fc-timegrid-slot-label {
+    width: 3.25rem;
+  }
+  .appointment-calendar .fc .fc-timegrid-slot-label-cushion {
+    font-size: 0.65rem;
+  }
+}
+
+/* Dashboard day view: keep the time grid readable inside the card. */
+.appointment-calendar--compact .fc .fc-timegrid-slot {
+  height: 2rem;
+}
+.appointment-calendar--compact .fc .fc-timegrid-slot-label-cushion {
+  font-size: 0.7rem;
+}
+.appointment-calendar--compact .fc .fc-event {
+  font-size: 0.75rem;
+  line-height: 1.25;
+  padding: 2px 4px;
+}
+.appointment-calendar--compact .fc .fc-timegrid-event .fc-event-main {
+  padding: 3px 4px;
+}
+.appointment-calendar--compact .fc .fc-timegrid-event .fc-event-title {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .appointment-calendar--compact .fc .fc-toolbar {
+    align-items: center;
+  }
+  .appointment-calendar--compact .fc .fc-toolbar-title {
+    font-size: 0.82rem;
+  }
+  .appointment-calendar--compact .fc .fc-timegrid-slot {
+    height: 1.75rem;
+  }
+}

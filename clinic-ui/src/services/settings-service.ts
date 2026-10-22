@@ -19,6 +19,17 @@ export interface PageResult<T> {
   totalPages: number;
 }
 
+export interface AvailableDoctorRecord {
+  id: string;
+  doctorNumber: string;
+  title: string;
+  firstName: string;
+  middleName: string | null;
+  lastName: string;
+  department?: { name: string } | null;
+  primarySpecialty?: { name: string } | null;
+}
+
 export const settingsService = {
   getUsers: (params: Record<string, string | number | undefined>) =>
     apiClient.get<PageResult<any>>("/users", { params }),
@@ -38,4 +49,8 @@ export const settingsService = {
     apiClient.get<RolePermissionsResponse>(`/roles/${roleId}/permissions`),
   updateRolePermissions: (roleId: string, permissionIds: string[]) =>
     apiClient.put(`/roles/${roleId}/permissions`, { permissionIds }),
+  getAvailableDoctors: (clinicId: string) =>
+    apiClient.get<AvailableDoctorRecord[]>("/users/available-doctors", {
+      params: { clinicId },
+    }),
 };

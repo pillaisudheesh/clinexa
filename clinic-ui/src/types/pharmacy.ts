@@ -82,6 +82,7 @@ export interface PharmacyPrescriptionQuery {
   limit?: number;
   search?: string;
   status?: PharmacyPrescriptionStatus;
+  patientId?: string;
 }
 
 export interface PaginatedPharmacyPrescriptions {

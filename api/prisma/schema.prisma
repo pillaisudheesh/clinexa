@@ -221,6 +221,8 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  doctorProfile Doctor? @relation("UserDoctorProfile")
+
   @@index([clinicId])
   @@index([status])
 }
@@ -507,6 +509,9 @@ model Doctor {
   appointments   Appointment[]
   medicalRecords MedicalRecord[]
   labOrders      LabOrder[]
+
+  userId String? @unique
+  user   User?   @relation("UserDoctorProfile", fields: [userId], references: [id], onDelete: SetNull)
 
   @@unique([clinicId, doctorNumber])
   @@index([clinicId])
