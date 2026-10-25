@@ -25,6 +25,7 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import { PermissionCodes } from '../auth/constants/permission-codes';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { PasswordChangeGuard } from '../auth/guards/password-change.guard';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -35,7 +36,7 @@ interface AuthenticatedRequest extends Request {
 
 @ApiBearerAuth()
 @Controller('appointments')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, PasswordChangeGuard)
 export class AppointmentsController {
   constructor(private readonly appointmentsService: AppointmentsService) {}
 

@@ -27,11 +27,12 @@ import { UpdatePatientStatusDto } from './dto/update-patient-status.dto';
 import { PatientQueryDto } from './dto/patient-query.dto';
 import { PatientResponseDto } from './dto/patient-response.dto';
 import { Patient360ResponseDto } from './dto/patient-360-response.dto';
+import { PasswordChangeGuard } from '../auth/guards/password-change.guard';
 
 @ApiTags('Patients')
 @ApiBearerAuth()
 @Controller('patients')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, PasswordChangeGuard)
 export class PatientsController {
   constructor(private readonly patientsService: PatientsService) {}
 

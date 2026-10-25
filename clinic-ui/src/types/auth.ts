@@ -15,6 +15,7 @@ export interface AuthUser {
   role?: string | null;
   roles: Array<string | { id?: string; name?: string; code?: string }>;
   permissions: string[];
+  mustChangePassword: boolean;
 }
 
 export interface LoginResponse {
@@ -22,4 +23,5 @@ export interface LoginResponse {
   tokenType: string;
   expiresIn: string;
   user: AuthUser;
+  mustChangePassword: boolean;
 }

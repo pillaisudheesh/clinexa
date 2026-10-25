@@ -26,6 +26,7 @@ import { PermissionCodes } from '../auth/constants/permission-codes';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { PasswordChangeGuard } from '../auth/guards/password-change.guard';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -36,7 +37,7 @@ interface AuthenticatedRequest extends Request {
 
 @ApiBearerAuth()
 @Controller('billing')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, PasswordChangeGuard)
 export class BillingController {
   constructor(private readonly billingService: BillingService) {}
 

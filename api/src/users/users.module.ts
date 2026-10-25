@@ -4,9 +4,10 @@ import { UsersController } from './users.controller';
 import { UsersRepository } from './repositories/users.repository';
 import { UsersService } from './users.service';
 import { AuditModule } from '../audit/audit.module';
+import { EmailModule } from '../email/email.module';
 
 @Module({
-  imports: [PrismaModule, AuditModule],
+  imports: [PrismaModule, AuditModule, EmailModule],
   controllers: [UsersController],
   providers: [UsersService, UsersRepository],
   exports: [UsersService],

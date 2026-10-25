@@ -3,7 +3,8 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "./auth-context";
 
 export function ProtectedRoute() {
-  const { isAuthenticated, isInitializing } = useAuth();
+  const { user, isAuthenticated, isInitializing } = useAuth();
+  console.log(user);
 
   const location = useLocation();
 
@@ -25,6 +26,10 @@ export function ProtectedRoute() {
         }}
       />
     );
+  }
+
+  if (user?.mustChangePassword === true) {
+    return <Navigate to="/login" replace />;
   }
 
   return <Outlet />;

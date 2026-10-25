@@ -222,6 +222,9 @@ model User {
   updatedAt DateTime @updatedAt
 
   doctorProfile Doctor? @relation("UserDoctorProfile")
+  mustChangePassword Boolean @default(false)
+  passwordChangedAt  DateTime?
+  passwordResetTokens PasswordResetToken[]
 
   @@index([clinicId])
   @@index([status])
@@ -1220,4 +1223,19 @@ model AuditLog {
   @@index([clinicId, createdAt])
   @@index([userId, createdAt])
   @@map("audit_logs")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }

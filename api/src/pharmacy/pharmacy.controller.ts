@@ -28,6 +28,7 @@ import { MedicineQueryDto } from './dto/medicine-query.dto';
 import { PharmacyMedicineResponseDto } from './dto/medicine-response.dto';
 import { UpdatePharmacyMedicineDto } from './dto/update-medicine.dto';
 import { UpdateMedicineStatusDto } from './dto/update-medicine-status.dto';
+import { PasswordChangeGuard } from '../auth/guards/password-change.guard';
 
 interface AuthenticatedRequest extends Request {
   user: { id: string; clinicId: string };
@@ -36,7 +37,7 @@ interface AuthenticatedRequest extends Request {
 @ApiTags('Pharmacy')
 @ApiBearerAuth()
 @Controller('pharmacy/medicines')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, PasswordChangeGuard)
 export class PharmacyController {
   constructor(private readonly pharmacyService: PharmacyService) {}
 

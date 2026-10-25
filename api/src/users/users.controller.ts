@@ -34,10 +34,13 @@ import { UserQueryDto } from './dto/user-query.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 
+import { CreateUserResultDto } from './dto/create-user-result.dto';
+import { PasswordChangeGuard } from '../auth/guards/password-change.guard';
+
 @ApiTags('Users')
 @ApiBearerAuth()
 @Controller('users')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, PasswordChangeGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -123,7 +126,7 @@ export class UsersController {
   create(
     @Body() dto: CreateUserDto,
     @CurrentUser() user: AuthenticatedUser,
-  ): Promise<UserResponseDto> {
+  ): Promise<CreateUserResultDto> {
     return this.usersService.create(dto, user);
   }
 

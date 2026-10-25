@@ -13,12 +13,20 @@ export const authService = {
     );
 
     const data = response.data;
+    const user = {
+      ...data.user,
+      mustChangePassword:
+        data.mustChangePassword ?? data.user.mustChangePassword,
+    };
 
     localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
 
     localStorage.setItem(USER_KEY, JSON.stringify(data.user));
 
-    return data;
+    return {
+      ...data,
+      user,
+    };
   },
 
   async getCurrentUser(): Promise<AuthUser> {
@@ -62,5 +70,40 @@ export const authService = {
 
   isAuthenticated() {
     return Boolean(localStorage.getItem(ACCESS_TOKEN_KEY));
+  },
+
+  async changePassword(payload: {
+    currentPassword: string;
+    newPassword: string;
+  }): Promise<{ message: string }> {
+    const response = await apiClient.patch<{ message: string }>(
+      "/auth/change-password",
+      payload,
+    );
+
+    return response.data;
+  },
+
+  async forgotPassword(payload: {
+    email: string;
+  }): Promise<{ message: string }> {
+    const response = await apiClient.post<{ message: string }>(
+      "/auth/forgot-password",
+      payload,
+    );
+
+    return response.data;
+  },
+
+  async resetPassword(payload: {
+    token: string;
+    newPassword: string;
+  }): Promise<{ message: string }> {
+    const response = await apiClient.post<{ message: string }>(
+      "/auth/reset-password",
+      payload,
+    );
+
+    return response.data;
   },
 };

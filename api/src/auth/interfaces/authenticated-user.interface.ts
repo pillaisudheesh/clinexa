@@ -4,6 +4,7 @@ export interface AuthenticatedUser {
   email: string;
   status: string;
   isPlatformAdmin?: boolean;
+  mustChangePassword: boolean;
   roles: string[];
   roleCodes?: string[];
 }

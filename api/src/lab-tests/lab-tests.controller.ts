@@ -34,6 +34,7 @@ import { LabTestQueryDto } from './dto/lab-test-query.dto';
 import { LabTestResponseDto } from './dto/lab-test-response.dto';
 
 import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
+import { PasswordChangeGuard } from '../auth/guards/password-change.guard';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -45,7 +46,7 @@ interface AuthenticatedRequest extends Request {
 @ApiTags('Lab Tests')
 @ApiBearerAuth()
 @Controller('lab-tests')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, PasswordChangeGuard)
 export class LabTestsController {
   constructor(private readonly labTestsService: LabTestsService) {}
 

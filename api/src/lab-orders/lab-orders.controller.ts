@@ -36,6 +36,7 @@ import { LabOrderResponseDto } from './dto/lab-order-response.dto';
 import { UpdateLabOrderStatusDto } from './dto/update-lab-order-status.dto';
 
 import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
+import { PasswordChangeGuard } from '../auth/guards/password-change.guard';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -47,7 +48,7 @@ interface AuthenticatedRequest extends Request {
 @ApiTags('Lab Orders')
 @ApiBearerAuth()
 @Controller('lab-orders')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, PasswordChangeGuard)
 export class LabOrdersController {
   constructor(private readonly labOrdersService: LabOrdersService) {}
 

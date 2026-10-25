@@ -3,6 +3,7 @@ import {
   ConflictException,
   NotFoundException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -16,6 +17,9 @@ import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
 import { UserQueryDto } from './dto/user-query.dto';
 import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
+import { randomBytes } from 'node:crypto';
+import { EmailService } from '../email/email.service';
+import { CreateUserResultDto } from './dto/create-user-result.dto';
 
 type UserWithRoles = Prisma.UserGetPayload<{
   include: {
@@ -30,9 +34,11 @@ type UserWithRoles = Prisma.UserGetPayload<{
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly emailService: EmailService,
   ) {}
 
   /**
@@ -56,7 +62,7 @@ export class UsersService {
   async create(
     dto: CreateUserDto,
     requester: AuthenticatedUser,
-  ): Promise<UserResponseDto> {
+  ): Promise<CreateUserResultDto> {
     const isPlatformAdmin = this.isPlatformAdministrator(requester);
 
     if (!isPlatformAdmin && dto.clinicId !== requester.clinicId) {
@@ -124,7 +130,9 @@ export class UsersService {
       }
     }
 
-    const passwordHash = await bcrypt.hash(dto.password, 10);
+    // Generate a cryptographically secure temporary password.
+    const temporaryPassword = randomBytes(18).toString('base64url');
+    const passwordHash = await bcrypt.hash(temporaryPassword, 12);
 
     const createdUser = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
@@ -134,6 +142,7 @@ export class UsersService {
           email: dto.email,
           passwordHash,
           clinicId: dto.clinicId,
+          mustChangePassword: true,
         },
       });
 
@@ -147,7 +156,6 @@ export class UsersService {
       }
 
       if (dto.doctorId) {
-        // Recheck ownership and unlinked status atomically.
         const linked = await tx.doctor.updateMany({
           where: {
             id: dto.doctorId,
@@ -191,7 +199,32 @@ export class UsersService {
       });
     });
 
-    return UserMapper.toResponseDto(createdUser);
+    // Send the email only after the transaction commits.
+    try {
+      await this.emailService.sendTemporaryPassword(
+        createdUser.email,
+        createdUser.firstName,
+        temporaryPassword,
+      );
+
+      return {
+        user: UserMapper.toResponseDto(createdUser),
+        emailSent: true,
+        message: 'User created and temporary-password email sent.',
+      };
+    } catch (error) {
+      this.logger.error(
+        `Temporary-password email delivery failed for user ${createdUser.id}.`,
+        error instanceof Error ? error.message : undefined,
+      );
+
+      return {
+        user: UserMapper.toResponseDto(createdUser),
+        emailSent: false,
+        message:
+          'User created, but the temporary-password email could not be sent. Use the password recovery workflow or an administrative recovery action.',
+      };
+    }
   }
 
   private async findClinic(clinicId: string) {

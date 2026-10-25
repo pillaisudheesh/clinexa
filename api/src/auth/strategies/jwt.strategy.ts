@@ -40,6 +40,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       email: user.email,
       status: user.status,
       isPlatformAdmin: user.isPlatformAdmin,
+      mustChangePassword: user.mustChangePassword,
       roles: user.roles.map((roleAssignment) => roleAssignment.role.name),
       roleCodes: user.roles.map((roleAssignment) => roleAssignment.role.code),
     };

@@ -39,7 +39,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isInitializing, setIsInitializing] = useState(true);
 
   const setSession = useCallback((sessionUser: AuthUser) => {
-    setUser(sessionUser);
+    const storedUser = authService.getUser();
+
+    const updatedUser: AuthUser = {
+      ...sessionUser,
+      mustChangePassword:
+        sessionUser.mustChangePassword ??
+        storedUser?.mustChangePassword ??
+        false,
+    };
+
+    setUser(updatedUser);
   }, []);
 
   const refreshUser = useCallback(async (): Promise<AuthUser | null> => {
@@ -50,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       const currentUser = await authService.getCurrentUser();
+      console.log(currentUser);
 
       setUser(currentUser);
 
@@ -74,7 +85,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const restoreSession = async () => {
       try {
-        await refreshUser();
+        if (authService.isAuthenticated()) {
+          const storedUser = authService.getUser();
+          console.log(storedUser);
+
+          if (storedUser) {
+            setUser(storedUser);
+          } else {
+            await refreshUser();
+          }
+        } else {
+          setUser(null);
+        }
       } finally {
         if (mounted) {
           setIsInitializing(false);

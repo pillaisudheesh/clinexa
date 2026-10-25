@@ -27,6 +27,7 @@ import { PermissionCodes } from '../auth/constants/permission-codes';
 import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 import { UpdateWorkingHoursDto } from './dto/update-working-hours.dto';
 import { UpdateClinicBrandingDto } from './dto/update-clinic-branding.dto';
+import { PasswordChangeGuard } from '../auth/guards/password-change.guard';
 
 const DEFAULTS = {
   openingTime: '09:00',
@@ -58,7 +59,7 @@ type UploadedLogoFile = {
 @ApiTags('Clinic Settings')
 @ApiBearerAuth()
 @Controller('clinic-settings')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, PasswordChangeGuard)
 export class ClinicSettingsController {
   constructor(private readonly prisma: PrismaService) {}
 

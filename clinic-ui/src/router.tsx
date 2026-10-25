@@ -26,11 +26,20 @@ import { SettingsPage } from "./pages/settings/settings-page";
 import { ClinicsPage } from "./pages/clinics/clinics-page";
 import { ClinicConfigurationPage } from "./pages/clinics/clinic-configuration-page";
 import { DepartmentsPage } from "./pages/departments/departments-page";
+import { ChangePasswordPage } from "@/pages/auth/change-password-page";
+import { ForgotPasswordPage } from "./pages/auth/forgot-password-page";
+import { ResetPasswordPage } from "./pages/auth/reset-password-page";
 
 export const router = createBrowserRouter([
   {
     path: "/login",
     element: <LoginPage />,
+  },
+  { path: "/reset-password", element: <ResetPasswordPage /> },
+  { path: "/change-password", element: <ChangePasswordPage /> },
+  {
+    path: "/forgot-password",
+    element: <ForgotPasswordPage />,
   },
 
   {

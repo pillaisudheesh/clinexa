@@ -41,6 +41,7 @@ import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { CreateStockReceiptDto } from './dto/create-stock-receipt.dto';
 import { StockReceiptResponseDto } from './dto/stock-receipt-response.dto';
 import { StockReceiptQueryDto } from './dto/stock-receipt-query.dto';
+import { PasswordChangeGuard } from '../auth/guards/password-change.guard';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -52,7 +53,7 @@ interface AuthenticatedRequest extends Request {
 @ApiTags('Inventory')
 @ApiBearerAuth()
 @Controller('inventory')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, PasswordChangeGuard)
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 

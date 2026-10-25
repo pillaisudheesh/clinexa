@@ -30,11 +30,12 @@ import { UpdateDepartmentStatusDto } from './dto/update-department-status.dto';
 import { DepartmentQueryDto } from './dto/department-query.dto';
 import { DepartmentResponseDto } from './dto/department-response.dto';
 import { PermissionCodes } from '../auth/constants/permission-codes';
+import { PasswordChangeGuard } from '../auth/guards/password-change.guard';
 
 @ApiTags('Departments')
 @ApiBearerAuth()
 @Controller('departments')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, PasswordChangeGuard)
 export class DepartmentsController {
   constructor(private readonly departmentsService: DepartmentsService) {}
 

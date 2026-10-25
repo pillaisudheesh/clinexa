@@ -9,12 +9,14 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { type StringValue } from 'ms';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { AuditModule } from '../audit/audit.module';
+import { EmailModule } from '../email/email.module';
 
 @Module({
   imports: [
     UsersModule,
     PassportModule,
     AuditModule,
+    EmailModule,
 
     JwtModule.registerAsync({
       imports: [ConfigModule],

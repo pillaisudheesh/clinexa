@@ -60,7 +60,11 @@ export function LoginPage() {
     try {
       const response = await authService.login({ email, password });
       setSession(response.user);
-      navigate("/", { replace: true });
+      if (response.mustChangePassword) {
+        navigate("/change-password", { replace: true });
+      } else {
+        navigate("/", { replace: true });
+      }
     } catch (err) {
       console.error(err);
       setError(
@@ -250,7 +254,8 @@ export function LoginPage() {
 
                       <button
                         type="button"
-                        className="text-sm font-medium text-teal-700 transition-colors hover:text-teal-800"
+                        onClick={() => navigate("/forgot-password")}
+                        className="cursor-pointer text-sm font-medium text-teal-700 transition-colors hover:text-teal-800"
                       >
                         Forgot password?
                       </button>

@@ -21,11 +21,12 @@ import { MedicalRecordsService } from './medical-records.service';
 import { CreateMedicalRecordDto } from './dto/create-medical-record.dto';
 import { UpdateMedicalRecordDto } from './dto/update-medical-record.dto';
 import { MedicalRecordQueryDto } from './dto/medical-record-query.dto';
+import { PasswordChangeGuard } from '../auth/guards/password-change.guard';
 
 @ApiTags('Medical Records')
 @ApiBearerAuth()
 @Controller('medical-records')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, PasswordChangeGuard)
 export class MedicalRecordsController {
   constructor(private readonly medicalRecordsService: MedicalRecordsService) {}
 
