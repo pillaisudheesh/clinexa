@@ -5,6 +5,7 @@ import {
   Building2,
   ChevronDown,
   FlaskConical,
+  Hospital,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -13,10 +14,12 @@ import {
   Receipt,
   Search,
   Settings,
+  SlidersHorizontal,
   Stethoscope,
   UsersRound,
   X,
   Store,
+  PanelsTopLeft,
 } from "lucide-react";
 import { NavLink, useLocation, Outlet } from "react-router-dom";
 import { type ComponentType, useEffect, useRef, useState } from "react";
@@ -121,19 +124,19 @@ const secondaryNavigation: NavigationItem[] = [
   {
     label: "Clinics",
     path: "/clinics",
-    icon: Building2,
+    icon: Hospital,
     permission: "CLINIC_READ",
   },
   {
     label: "Departments",
     path: "/departments",
-    icon: Building2,
+    icon: PanelsTopLeft,
     permission: "DEPARTMENT_READ",
   },
   {
     label: "Clinic Configuration",
     path: "/clinic-configuration",
-    icon: Settings,
+    icon: SlidersHorizontal,
     permission: "SETTINGS_READ",
   },
   {
