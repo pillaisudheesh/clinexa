@@ -32,6 +32,35 @@ export class InventoryService {
     private readonly auditService: AuditService,
   ) {}
 
+  private async assertClinicAndOrganizationActive(
+    clinicId: string,
+  ): Promise<void> {
+    const clinic = await this.prisma.clinic.findUnique({
+      where: { id: clinicId },
+      select: {
+        id: true,
+        isActive: true,
+        organization: {
+          select: {
+            isActive: true,
+          },
+        },
+      },
+    });
+
+    if (!clinic) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    if (!clinic.isActive) {
+      throw new BadRequestException('Clinic is inactive');
+    }
+
+    if (clinic.organization && !clinic.organization.isActive) {
+      throw new BadRequestException('Organization is inactive');
+    }
+  }
+
   // ===========================================================================
   // CREATE BATCH
   // ===========================================================================
@@ -41,6 +70,7 @@ export class InventoryService {
     dto: CreateMedicineBatchDto,
     actorId: string,
   ): Promise<MedicineBatchResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const medicine = await this.prisma.medicine.findFirst({
       where: {
         id: dto.medicineId,
@@ -306,6 +336,7 @@ export class InventoryService {
     dto: AdjustStockDto,
     actorId: string,
   ): Promise<MedicineBatchResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     if (dto.quantity === 0) {
       throw new BadRequestException('Stock adjustment quantity cannot be zero');
     }
@@ -672,6 +703,7 @@ export class InventoryService {
     actorId: string,
   ): Promise<MedicineBatchResponseDto> {
     return this.prisma.$transaction(async (tx) => {
+      await this.assertClinicAndOrganizationActive(clinicId);
       const batch = await tx.medicineBatch.findFirst({
         where: {
           id,
@@ -944,6 +976,7 @@ export class InventoryService {
     dto: CreateStockReceiptDto,
     actorId: string,
   ): Promise<StockReceiptResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     if (!dto.items.length) {
       throw new BadRequestException('At least one medicine is required');
     }

@@ -21,8 +21,37 @@ const ZERO = new Prisma.Decimal('0.00');
 @Injectable()
 export class BillingService {
   constructor(private readonly prisma: PrismaService) {}
+  private async assertClinicAndOrganizationActive(
+    clinicId: string,
+  ): Promise<void> {
+    const clinic = await this.prisma.clinic.findUnique({
+      where: { id: clinicId },
+      select: {
+        id: true,
+        isActive: true,
+        organization: {
+          select: {
+            isActive: true,
+          },
+        },
+      },
+    });
+
+    if (!clinic) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    if (!clinic.isActive) {
+      throw new BadRequestException('Clinic is inactive');
+    }
+
+    if (clinic.organization && !clinic.organization.isActive) {
+      throw new BadRequestException('Organization is inactive');
+    }
+  }
 
   async create(clinicId: string, dto: CreateBillingInvoiceDto) {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const patient = await this.prisma.patient.findFirst({
       where: { id: dto.patientId, clinicId, isActive: true },
       select: { id: true },
@@ -223,6 +252,7 @@ export class BillingService {
     invoiceId: string,
     dto: UpdateBillingInvoiceDto,
   ) {
+    await this.assertClinicAndOrganizationActive(clinicId);
     return this.prisma.$transaction(
       async (tx) => {
         const invoice = await tx.invoice.findFirst({
@@ -378,6 +408,7 @@ export class BillingService {
     invoiceId: string,
     dto: CreateBillingPaymentDto,
   ) {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const amount = new Prisma.Decimal(dto.amount).toDecimalPlaces(2);
     if (!amount.greaterThan(0))
       throw new BadRequestException('Payment amount must be greater than zero');
@@ -439,6 +470,7 @@ export class BillingService {
   }
 
   async issue(clinicId: string, invoiceId: string) {
+    await this.assertClinicAndOrganizationActive(clinicId);
     return this.prisma.$transaction(
       async (tx) => {
         const invoice = await tx.invoice.findFirst({
@@ -469,6 +501,7 @@ export class BillingService {
   }
 
   async cancel(clinicId: string, invoiceId: string) {
+    await this.assertClinicAndOrganizationActive(clinicId);
     return this.prisma.$transaction(
       async (tx) => {
         const invoice = await tx.invoice.findFirst({

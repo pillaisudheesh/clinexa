@@ -269,7 +269,7 @@ export function ClinicConfigurationPage() {
                     {branding.tagline || "Clinic tagline (optional)"}
                   </p>
                   <p className="mt-1 text-xs font-medium text-teal-700">
-                    Powered by SamaRoot
+                    Powered by SamaRoot Health
                   </p>
                 </div>
               </div>

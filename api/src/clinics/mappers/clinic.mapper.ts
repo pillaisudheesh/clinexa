@@ -1,12 +1,19 @@
 import { Clinic } from '@prisma/client';
 import { ClinicResponseDto } from '../dto/clinic-response.dto';
 
+type ClinicWithOrganization = Clinic & {
+  organization?: {
+    name: string;
+  } | null;
+};
+
 export class ClinicMapper {
-  static toResponseDto(clinic: Clinic): ClinicResponseDto {
+  static toResponseDto(clinic: ClinicWithOrganization): ClinicResponseDto {
     return {
       id: clinic.id,
       code: clinic.code,
       name: clinic.name,
+      organizationName: clinic.organization?.name ?? null,
       email: clinic.email,
       phone: clinic.phone,
       website: clinic.website,

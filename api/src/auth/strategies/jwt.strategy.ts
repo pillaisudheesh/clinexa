@@ -34,6 +34,20 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('User is inactive');
     }
 
+    if (!user.isPlatformAdmin && user.clinicId) {
+      if (!user.clinic) {
+        throw new UnauthorizedException('User clinic not found');
+      }
+
+      if (!user.clinic.isActive) {
+        throw new UnauthorizedException('Clinic is inactive');
+      }
+
+      if (user.clinic.organization && !user.clinic.organization.isActive) {
+        throw new UnauthorizedException('Organization is inactive');
+      }
+    }
+
     return {
       id: user.id,
       clinicId: user.clinicId,

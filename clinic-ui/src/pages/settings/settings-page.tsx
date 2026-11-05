@@ -613,7 +613,7 @@ export function SettingsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-medium text-teal-600">
-            SamaRoot administration
+            SamaRoot Health administration
           </p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
             Settings

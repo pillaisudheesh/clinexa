@@ -29,6 +29,7 @@ import { DepartmentsPage } from "./pages/departments/departments-page";
 import { ChangePasswordPage } from "@/pages/auth/change-password-page";
 import { ForgotPasswordPage } from "./pages/auth/forgot-password-page";
 import { ResetPasswordPage } from "./pages/auth/reset-password-page";
+import { OrganizationsPage } from "./pages/organizations/organizations-page";
 
 export const router = createBrowserRouter([
   {
@@ -159,6 +160,10 @@ export const router = createBrowserRouter([
           {
             path: "clinic-configuration",
             element: <ClinicConfigurationPage />,
+          },
+          {
+            path: "organizations",
+            element: <OrganizationsPage />,
           },
         ],
       },

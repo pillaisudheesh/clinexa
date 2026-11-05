@@ -26,6 +26,35 @@ export class DoctorsService {
     private readonly auditService: AuditService,
   ) {}
 
+  private async assertClinicAndOrganizationActive(
+    clinicId: string,
+  ): Promise<void> {
+    const clinic = await this.prisma.clinic.findUnique({
+      where: { id: clinicId },
+      select: {
+        id: true,
+        isActive: true,
+        organization: {
+          select: {
+            isActive: true,
+          },
+        },
+      },
+    });
+
+    if (!clinic) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    if (!clinic.isActive) {
+      throw new BadRequestException('Clinic is inactive');
+    }
+
+    if (clinic.organization && !clinic.organization.isActive) {
+      throw new BadRequestException('Organization is inactive');
+    }
+  }
+
   // ===========================================================================
   // CREATE
   // ===========================================================================
@@ -35,6 +64,7 @@ export class DoctorsService {
     dto: CreateDoctorDto,
     actorId: string,
   ): Promise<DoctorResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     await this.validateReferences(clinicId, dto);
 
     const doctorNumber = await this.generateDoctorNumber(clinicId);
@@ -388,6 +418,7 @@ export class DoctorsService {
     dto: UpdateDoctorDto,
     actorId: string,
   ): Promise<DoctorResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const existingDoctor = await this.prisma.doctor.findFirst({
       where: {
         id,
@@ -640,6 +671,7 @@ export class DoctorsService {
     dto: UpdateDoctorStatusDto,
     actorId: string,
   ): Promise<DoctorResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const existingDoctor = await this.prisma.doctor.findFirst({
       where: {
         id,
@@ -683,6 +715,7 @@ export class DoctorsService {
   // ===========================================================================
 
   async remove(clinicId: string, id: string, actorId: string) {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const existingDoctor = await this.prisma.doctor.findFirst({
       where: {
         id,

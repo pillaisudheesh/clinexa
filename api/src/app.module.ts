@@ -37,6 +37,7 @@ import { BillingModule } from './billing/billing.module';
 import { ReportsModule } from './reports/reports.module';
 import { ClinicSettingsModule } from './clinic-settings/clinic-settings.module';
 import { AuditModule } from './audit/audit.module';
+import { OrganizationsModule } from './organizations/organizations.module';
 
 @Module({
   imports: [
@@ -76,6 +77,7 @@ import { AuditModule } from './audit/audit.module';
     ReportsModule,
     ClinicSettingsModule,
     AuditModule,
+    OrganizationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

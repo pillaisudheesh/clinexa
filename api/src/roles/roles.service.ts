@@ -2,6 +2,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
@@ -22,6 +23,34 @@ export class RolesService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
   ) {}
+  private async assertClinicAndOrganizationActive(
+    clinicId: string,
+  ): Promise<void> {
+    const clinic = await this.prisma.clinic.findUnique({
+      where: { id: clinicId },
+      select: {
+        id: true,
+        isActive: true,
+        organization: {
+          select: {
+            isActive: true,
+          },
+        },
+      },
+    });
+
+    if (!clinic) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    if (!clinic.isActive) {
+      throw new BadRequestException('Clinic is inactive');
+    }
+
+    if (clinic.organization && !clinic.organization.isActive) {
+      throw new BadRequestException('Organization is inactive');
+    }
+  }
 
   async findAll(
     clinicId: string,
@@ -86,6 +115,7 @@ export class RolesService {
     dto: CreateRoleDto,
     actorId: string,
   ): Promise<RoleResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const normalizedCode = dto.code
       .trim()
       .toUpperCase()
@@ -159,6 +189,7 @@ export class RolesService {
     dto: UpdateRoleDto,
     actorId: string,
   ): Promise<RoleResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const role = await this.prisma.role.findFirst({ where: { id, clinicId } });
     if (!role) throw new NotFoundException('Role not found');
     if (role.isSystem) {
@@ -224,6 +255,7 @@ export class RolesService {
     isActive: boolean,
     actorId: string,
   ): Promise<RoleResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const role = await this.prisma.role.findFirst({ where: { id, clinicId } });
     if (!role) throw new NotFoundException('Role not found');
     if (role.isSystem) {

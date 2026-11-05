@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -15,11 +19,41 @@ export class MedicinesService {
     private readonly auditService: AuditService,
   ) {}
 
+  private async assertClinicAndOrganizationActive(
+    clinicId: string,
+  ): Promise<void> {
+    const clinic = await this.prisma.clinic.findUnique({
+      where: { id: clinicId },
+      select: {
+        id: true,
+        isActive: true,
+        organization: {
+          select: {
+            isActive: true,
+          },
+        },
+      },
+    });
+
+    if (!clinic) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    if (!clinic.isActive) {
+      throw new BadRequestException('Clinic is inactive');
+    }
+
+    if (clinic.organization && !clinic.organization.isActive) {
+      throw new BadRequestException('Organization is inactive');
+    }
+  }
+
   async create(
     clinicId: string,
     dto: CreateMedicineDto,
     actorId: string,
   ): Promise<MedicineResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const medicine = await this.prisma.$transaction(async (tx) => {
       const created = await tx.medicine.create({
         data: {
@@ -105,6 +139,7 @@ export class MedicinesService {
     dto: UpdateMedicineDto,
     actorId: string,
   ): Promise<MedicineResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const medicine = await this.prisma.$transaction(async (tx) => {
       const existing = await tx.medicine.findFirst({ where: { id, clinicId } });
       if (!existing) throw new NotFoundException('Medicine not found');
@@ -148,11 +183,15 @@ export class MedicinesService {
     id: string,
     actorId: string,
   ): Promise<{ message: string }> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     await this.prisma.$transaction(async (tx) => {
       const existing = await tx.medicine.findFirst({ where: { id, clinicId } });
       if (!existing) throw new NotFoundException('Medicine not found');
       if (!existing.isActive) return;
-      await tx.medicine.update({ where: { id, clinicId }, data: { isActive: false } });
+      await tx.medicine.update({
+        where: { id, clinicId },
+        data: { isActive: false },
+      });
       await this.auditService.createInTransaction(tx, {
         clinicId,
         actorId,

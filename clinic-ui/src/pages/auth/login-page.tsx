@@ -125,9 +125,9 @@ export function LoginPage() {
               </h1>
 
               <p className="mt-7 max-w-2xl text-base leading-7 text-cyan-50/85 xl:text-lg">
-                SamaRoot brings your clinic&apos;s patients, appointments,
-                consultations, laboratory, pharmacy and billing workflows
-                together in one secure workspace.
+                SamaRoot Health brings your clinic&apos;s patients,
+                appointments, consultations, laboratory, pharmacy and billing
+                workflows together in one secure workspace.
               </p>
 
               <div className="mt-9 grid max-w-3xl grid-cols-3 gap-4">
@@ -168,7 +168,7 @@ export function LoginPage() {
           </div>
 
           <div className="relative z-10 flex items-center justify-between text-xs text-cyan-50/65">
-            <span>© {new Date().getFullYear()} SamaRoot</span>
+            <span>© {new Date().getFullYear()} SamaRoot Health</span>
             <span>Smarter Care. Better Outcomes.</span>
           </div>
         </section>
@@ -209,7 +209,7 @@ export function LoginPage() {
                   </h2>
 
                   <p className="mt-2 text-sm leading-6 text-slate-500">
-                    Sign in to access your SamaRoot account.
+                    Sign in to access your SamaRoot Health account.
                   </p>
                 </div>
 
@@ -340,8 +340,8 @@ export function LoginPage() {
             </Card>
 
             <p className="mt-5 text-center text-xs text-slate-400 lg:hidden">
-              © {new Date().getFullYear()} SamaRoot · Smarter Care. Better
-              Outcomes.
+              © {new Date().getFullYear()} SamaRoot Health · Smarter Care.
+              Better Outcomes.
             </p>
           </div>
         </section>

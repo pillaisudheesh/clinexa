@@ -3,6 +3,7 @@ import {
   ConflictException,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -21,17 +22,6 @@ import { randomBytes } from 'node:crypto';
 import { EmailService } from '../email/email.service';
 import { CreateUserResultDto } from './dto/create-user-result.dto';
 
-type UserWithRoles = Prisma.UserGetPayload<{
-  include: {
-    roles: {
-      include: {
-        role: true;
-      };
-    };
-    doctorProfile: true;
-  };
-}>;
-
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
@@ -40,6 +30,35 @@ export class UsersService {
     private readonly auditService: AuditService,
     private readonly emailService: EmailService,
   ) {}
+
+  private async assertClinicAndOrganizationActive(
+    clinicId: string,
+  ): Promise<void> {
+    const clinic = await this.prisma.clinic.findUnique({
+      where: { id: clinicId },
+      select: {
+        id: true,
+        isActive: true,
+        organization: {
+          select: {
+            isActive: true,
+          },
+        },
+      },
+    });
+
+    if (!clinic) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    if (!clinic.isActive) {
+      throw new BadRequestException('Clinic is inactive');
+    }
+
+    if (clinic.organization && !clinic.organization.isActive) {
+      throw new BadRequestException('Organization is inactive');
+    }
+  }
 
   /**
    * Platform-wide user management is controlled only by the persisted
@@ -64,6 +83,7 @@ export class UsersService {
     requester: AuthenticatedUser,
   ): Promise<CreateUserResultDto> {
     const isPlatformAdmin = this.isPlatformAdministrator(requester);
+    await this.assertClinicAndOrganizationActive(dto.clinicId);
 
     if (!isPlatformAdmin && dto.clinicId !== requester.clinicId) {
       throw new ForbiddenException(
@@ -286,10 +306,27 @@ export class UsersService {
     return this.prisma.user.findUnique({ where: { email } });
   }
 
-  async findById(id: string): Promise<UserWithRoles | null> {
+  async findById(id: string) {
     return this.prisma.user.findUnique({
       where: { id },
-      include: { roles: { include: { role: true } }, doctorProfile: true },
+      include: {
+        roles: {
+          include: { role: true },
+        },
+        doctorProfile: true,
+        clinic: {
+          select: {
+            id: true,
+            isActive: true,
+            organization: {
+              select: {
+                id: true,
+                isActive: true,
+              },
+            },
+          },
+        },
+      },
     });
   }
 
@@ -315,6 +352,10 @@ export class UsersService {
     ) {
       throw new ForbiddenException('You cannot move a user to another clinic.');
     }
+
+    const targetClinicId = dto.clinicId ?? existingUser.clinicId;
+
+    await this.assertClinicAndOrganizationActive(targetClinicId);
 
     if (dto.email && dto.email !== existingUser.email) {
       const userWithEmail = await this.findByEmail(dto.email);
@@ -349,7 +390,6 @@ export class UsersService {
         throw new NotFoundException('One or more roles were not found.');
       }
 
-      const targetClinicId = dto.clinicId ?? existingUser.clinicId;
       if (roles.some((role) => role.clinicId !== targetClinicId)) {
         throw new ForbiddenException(
           "All assigned roles must belong to the user's clinic.",
@@ -464,11 +504,15 @@ export class UsersService {
     requester: AuthenticatedUser,
   ): Promise<UserResponseDto> {
     const existingUser = await this.findById(id);
+    if (!existingUser) {
+      throw new NotFoundException('User not found.');
+    }
+
+    await this.assertClinicAndOrganizationActive(existingUser.clinicId);
 
     if (
-      !existingUser ||
-      (!this.isPlatformAdministrator(requester) &&
-        existingUser.clinicId !== requester.clinicId)
+      !this.isPlatformAdministrator(requester) &&
+      existingUser.clinicId !== requester.clinicId
     ) {
       throw new NotFoundException('User not found.');
     }

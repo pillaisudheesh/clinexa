@@ -170,7 +170,7 @@ export class EmailService {
                        border-top: 1px solid #edf2f7;">
               <p style="margin: 0; color: #64748b; font-size: 11px;
                         line-height: 18px;">
-                Secure Healthcare Management
+                Connected Care Management
               </p>
               <p style="margin: 5px 0 0; color: #94a3b8;
                         font-size: 11px;">

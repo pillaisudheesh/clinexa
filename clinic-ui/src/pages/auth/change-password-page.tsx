@@ -94,7 +94,7 @@ export function ChangePasswordPage() {
 
             <p className="mt-2 text-sm leading-6 text-slate-600">
               For your account security, set a new password before continuing to
-              SamaRoot.
+              SamaRoot Health.
             </p>
 
             <div className="mt-5 flex gap-3 rounded-xl !border-0 bg-slate-50/60 p-3 text-sm text-slate-700 !shadow-none !outline-none ring-1 ring-inset ring-slate-200/60">

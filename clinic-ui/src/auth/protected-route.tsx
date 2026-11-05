@@ -11,7 +11,7 @@ export function ProtectedRoute() {
   if (isInitializing) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-app-background">
-        <div className="text-sm text-app-muted">Loading SamaRoot...</div>
+        <div className="text-sm text-app-muted">Loading SamaRoot Health...</div>
       </div>
     );
   }

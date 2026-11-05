@@ -93,6 +93,33 @@ const appointmentInclude = {
 export class LabOrdersService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private async assertClinicAndOrganizationActive(
+    clinicId: string,
+  ): Promise<void> {
+    const clinic = await this.prisma.clinic.findUnique({
+      where: { id: clinicId },
+      select: {
+        id: true,
+        isActive: true,
+        organization: {
+          select: { isActive: true },
+        },
+      },
+    });
+
+    if (!clinic) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    if (!clinic.isActive) {
+      throw new BadRequestException('Clinic is inactive');
+    }
+
+    if (clinic.organization && !clinic.organization.isActive) {
+      throw new BadRequestException('Organization is inactive');
+    }
+  }
+
   // ===========================================================================
   // CREATE
   // ===========================================================================
@@ -101,6 +128,7 @@ export class LabOrdersService {
     clinicId: string,
     dto: CreateLabOrderDto,
   ): Promise<LabOrderResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const labOrder = await this.prisma.$transaction(async (tx) => {
       // -------------------------------------------------------------------
       // Validate appointment
@@ -430,6 +458,7 @@ export class LabOrdersService {
     id: string,
     dto: UpdateLabOrderStatusDto,
   ): Promise<LabOrderResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const updatedOrder = await this.prisma.$transaction(async (tx) => {
       const order = await tx.labOrder.findFirst({
         where: { id, clinicId },
@@ -498,6 +527,7 @@ export class LabOrdersService {
     dto: CreateLabResultDto,
   ): Promise<LabOrderResponseDto> {
     let labOrderId: string | undefined;
+    await this.assertClinicAndOrganizationActive(clinicId);
 
     await this.prisma.$transaction(async (tx) => {
       // ---------------------------------------------------------------------
@@ -634,6 +664,7 @@ export class LabOrdersService {
     itemId: string,
     status: LabOrderItemStatus,
   ): Promise<LabOrderResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const item = await this.prisma.labOrderItem.findFirst({
       where: {
         id: itemId,

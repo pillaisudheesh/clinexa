@@ -23,6 +23,33 @@ export class PrescriptionsService {
     private readonly auditService: AuditService,
   ) {}
 
+  private async assertClinicAndOrganizationActive(
+    clinicId: string,
+  ): Promise<void> {
+    const clinic = await this.prisma.clinic.findUnique({
+      where: { id: clinicId },
+      select: {
+        id: true,
+        isActive: true,
+        organization: {
+          select: { isActive: true },
+        },
+      },
+    });
+
+    if (!clinic) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    if (!clinic.isActive) {
+      throw new BadRequestException('Clinic is inactive');
+    }
+
+    if (clinic.organization && !clinic.organization.isActive) {
+      throw new BadRequestException('Organization is inactive');
+    }
+  }
+
   /**
    * Create a prescription.
    * The prescription sequence, prescription creation, and audit log
@@ -33,6 +60,7 @@ export class PrescriptionsService {
     dto: CreatePrescriptionDto,
     actorId?: string,
   ): Promise<PrescriptionResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const medicalRecord = await this.prisma.medicalRecord.findFirst({
       where: {
         id: dto.medicalRecordId,
@@ -247,6 +275,7 @@ export class PrescriptionsService {
     dto: UpdatePrescriptionDto,
     actorId?: string,
   ): Promise<PrescriptionResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const suppliedFields = Object.keys(dto).filter(
       (key) => dto[key as keyof UpdatePrescriptionDto] !== undefined,
     );

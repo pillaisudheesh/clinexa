@@ -7,5 +7,5 @@ export class UpdateClinicStatusDto {
     description: 'Clinic active status',
   })
   @IsBoolean()
-  isActive: boolean;
+  isActive!: boolean;
 }

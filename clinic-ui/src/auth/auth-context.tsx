@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return currentUser;
     } catch (error) {
-      console.error("Unable to restore SamaRoot session.", error);
+      console.error("Unable to restore SamaRoot Health session.", error);
 
       /*
        * A 401 means the token is no longer valid.

@@ -32,6 +32,35 @@ type PaymentRecord = Prisma.PaymentGetPayload<{
 export class PaymentsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private async assertClinicAndOrganizationActive(
+    clinicId: string,
+  ): Promise<void> {
+    const clinic = await this.prisma.clinic.findUnique({
+      where: { id: clinicId },
+      select: {
+        id: true,
+        isActive: true,
+        organization: {
+          select: {
+            isActive: true,
+          },
+        },
+      },
+    });
+
+    if (!clinic) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    if (!clinic.isActive) {
+      throw new BadRequestException('Clinic is inactive');
+    }
+
+    if (clinic.organization && !clinic.organization.isActive) {
+      throw new BadRequestException('Organization is inactive');
+    }
+  }
+
   // ===========================================================================
   // CREATE PAYMENT
   // ===========================================================================
@@ -40,6 +69,7 @@ export class PaymentsService {
     clinicId: string,
     dto: CreatePaymentDto,
   ): Promise<PaymentResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     if (!Number.isFinite(dto.amount) || dto.amount <= 0) {
       throw new BadRequestException('Payment amount must be greater than zero');
     }
@@ -237,6 +267,7 @@ export class PaymentsService {
 
   async refund(clinicId: string, id: string): Promise<PaymentResponseDto> {
     try {
+      await this.assertClinicAndOrganizationActive(clinicId);
       const refundedPayment = await this.prisma.$transaction(
         async (tx) => {
           const payment = await tx.payment.findFirst({

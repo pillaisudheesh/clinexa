@@ -22,7 +22,7 @@ export function MobileHeader({ onMenuClick }: MobileHeaderProps) {
             <HeartPulse className="size-4" />
           </div>
 
-          <span className="font-semibold text-slate-900">SamaRoot</span>
+          <span className="font-semibold text-slate-900">SamaRoot Health</span>
         </div>
       </div>
 

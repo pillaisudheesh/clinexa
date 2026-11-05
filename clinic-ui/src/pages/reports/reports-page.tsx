@@ -308,7 +308,9 @@ export function ReportsPage() {
     <div className="space-y-5 p-4 sm:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-sm font-medium text-teal-600">SamaRoot insights</p>
+          <p className="text-sm font-medium text-teal-600">
+            SamaRoot Health insights
+          </p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
             Reports
           </h1>

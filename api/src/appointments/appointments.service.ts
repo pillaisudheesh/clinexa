@@ -45,6 +45,7 @@ export class AppointmentsService {
    * Create a new appointment.
    */
   async create(clinicId: string, dto: CreateAppointmentDto, actorId: string) {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const patient = await this.prisma.patient.findFirst({
       where: {
         id: dto.patientId,
@@ -421,6 +422,7 @@ export class AppointmentsService {
     dto: UpdateAppointmentDto,
     actorId: string,
   ) {
+    await this.assertClinicAndOrganizationActive(clinicId);
     await this.assertAppointmentOwnership(clinicId, id, actorId);
 
     const existing = await this.prisma.appointment.findFirst({
@@ -437,6 +439,10 @@ export class AppointmentsService {
     this.validateStatusForUpdate(existing.status);
 
     if (dto.status !== undefined && dto.status !== existing.status) {
+      if (dto.status !== AppointmentStatus.CANCELLED) {
+        await this.assertClinicAndOrganizationActive(clinicId);
+      }
+
       this.validateStatusTransition(existing.status, dto.status);
     }
 
@@ -662,6 +668,8 @@ export class AppointmentsService {
     query: AppointmentAvailabilityQueryDto,
     userId: string,
   ) {
+    await this.assertClinicAndOrganizationActive(clinicId);
+
     const linkedDoctorId = await this.getLinkedDoctorId(clinicId, userId);
     if (linkedDoctorId && linkedDoctorId !== query.doctorId) {
       throw new NotFoundException('Active doctor not found');
@@ -820,6 +828,7 @@ export class AppointmentsService {
    * Confirm appointment.
    */
   async confirm(clinicId: string, id: string, actorId: string) {
+    await this.assertClinicAndOrganizationActive(clinicId);
     return this.changeStatus(
       clinicId,
       id,
@@ -832,6 +841,7 @@ export class AppointmentsService {
    * Check patient in.
    */
   async checkIn(clinicId: string, id: string, actorId: string) {
+    await this.assertClinicAndOrganizationActive(clinicId);
     await this.assertAppointmentOwnership(clinicId, id, actorId);
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -964,6 +974,7 @@ export class AppointmentsService {
    * Start consultation.
    */
   async startConsultation(clinicId: string, id: string, actorId: string) {
+    await this.assertClinicAndOrganizationActive(clinicId);
     return this.changeStatus(
       clinicId,
       id,
@@ -982,6 +993,7 @@ export class AppointmentsService {
    * can be marked as completed.
    */
   async complete(clinicId: string, id: string, actorId: string) {
+    await this.assertClinicAndOrganizationActive(clinicId);
     await this.assertAppointmentOwnership(clinicId, id, actorId);
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -1538,6 +1550,10 @@ export class AppointmentsService {
         throw new NotFoundException('Appointment not found');
       }
 
+      if (status !== AppointmentStatus.CANCELLED) {
+        await this.assertClinicAndOrganizationActive(clinicId);
+      }
+
       this.validateStatusTransition(appointment.status, status);
 
       const changed = await tx.appointment.update({
@@ -1622,6 +1638,35 @@ export class AppointmentsService {
 
     if (end <= start) {
       throw new BadRequestException('endTime must be after startTime');
+    }
+  }
+
+  private async assertClinicAndOrganizationActive(
+    clinicId: string,
+  ): Promise<void> {
+    const clinic = await this.prisma.clinic.findUnique({
+      where: { id: clinicId },
+      select: {
+        id: true,
+        isActive: true,
+        organization: {
+          select: {
+            isActive: true,
+          },
+        },
+      },
+    });
+
+    if (!clinic) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    if (!clinic.isActive) {
+      throw new BadRequestException('Clinic is inactive');
+    }
+
+    if (clinic.organization && !clinic.organization.isActive) {
+      throw new BadRequestException('Organization is inactive');
     }
   }
 

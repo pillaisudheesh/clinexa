@@ -25,10 +25,11 @@ import { seedLabTests } from '../../prisma/seeds/lab-test.seed';
 export class ClinicsService {
   constructor(private readonly prisma: PrismaService) {}
 
-
   private validateTimezone(timezone: string): void {
     try {
-      new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format(new Date(0));
+      new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format(
+        new Date(0),
+      );
     } catch {
       throw new BadRequestException(`Invalid clinic timezone: ${timezone}`);
     }
@@ -60,12 +61,40 @@ export class ClinicsService {
 
   async create(dto: CreateClinicDto): Promise<ClinicResponseDto> {
     if (dto.timezone !== undefined) this.validateTimezone(dto.timezone);
+    if (dto.organizationId !== undefined) {
+      const organization = await this.prisma.organization.findUnique({
+        where: { id: dto.organizationId },
+        select: {
+          id: true,
+          isActive: true,
+        },
+      });
+
+      if (!organization) {
+        throw new NotFoundException('Organization not found.');
+      }
+
+      if (!organization.isActive) {
+        throw new BadRequestException(
+          'Cannot create a branch under an inactive organization.',
+        );
+      }
+    }
     const code = await this.generateClinicCode();
     const clinic = await this.prisma.$transaction(async (tx) => {
+      const { organizationId, ...clinicData } = dto;
+
       const createdClinic = await tx.clinic.create({
         data: {
-          ...dto,
+          ...clinicData,
           code,
+          ...(organizationId !== undefined
+            ? {
+                organization: {
+                  connect: { id: organizationId },
+                },
+              }
+            : {}),
         },
       });
 
@@ -109,48 +138,57 @@ export class ClinicsService {
       page = 1,
       limit = 10,
       search,
+      organizationId,
+      independent,
       sortBy = query.sortBy ?? ClinicSortField.CREATED_AT,
       sortOrder = 'desc',
     } = query;
 
     const skip = (page - 1) * limit;
 
-    const where: Prisma.ClinicWhereInput = search
-      ? {
-          OR: [
-            {
-              code: {
-                contains: search,
-                mode: 'insensitive',
+    const where: Prisma.ClinicWhereInput = {
+      ...(independent
+        ? { organizationId: null }
+        : organizationId
+          ? { organizationId }
+          : {}),
+      ...(search
+        ? {
+            OR: [
+              {
+                code: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
               },
-            },
-            {
-              name: {
-                contains: search,
-                mode: 'insensitive',
+              {
+                name: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
               },
-            },
-            {
-              city: {
-                contains: search,
-                mode: 'insensitive',
+              {
+                city: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
               },
-            },
-            {
-              state: {
-                contains: search,
-                mode: 'insensitive',
+              {
+                state: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
               },
-            },
-            {
-              email: {
-                contains: search,
-                mode: 'insensitive',
+              {
+                email: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
               },
-            },
-          ],
-        }
-      : {};
+            ],
+          }
+        : {}),
+    };
 
     const [clinics, total] = await this.prisma.$transaction([
       this.prisma.clinic.findMany({
@@ -159,6 +197,13 @@ export class ClinicsService {
         take: limit,
         orderBy: {
           [sortBy]: sortOrder,
+        },
+        include: {
+          organization: {
+            select: {
+              name: true,
+            },
+          },
         },
       }),
       this.prisma.clinic.count({

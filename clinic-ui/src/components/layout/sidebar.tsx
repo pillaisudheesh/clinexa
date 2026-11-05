@@ -32,7 +32,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {!collapsed && (
           <div className="min-w-0">
             <p className="truncate text-base font-semibold text-slate-900">
-              SamaRoot
+              SamaRoot Health
             </p>
 
             <p className="truncate text-xs text-slate-500">Healthcare</p>

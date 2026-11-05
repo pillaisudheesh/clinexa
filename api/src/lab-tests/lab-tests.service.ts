@@ -2,6 +2,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 
 import { LabTest, Prisma } from '@prisma/client';
@@ -21,6 +22,34 @@ type LabTestRecord = LabTest;
 @Injectable()
 export class LabTestsService {
   constructor(private readonly prisma: PrismaService) {}
+  private async assertClinicAndOrganizationActive(
+    clinicId: string,
+  ): Promise<void> {
+    const clinic = await this.prisma.clinic.findUnique({
+      where: { id: clinicId },
+      select: {
+        id: true,
+        isActive: true,
+        organization: {
+          select: {
+            isActive: true,
+          },
+        },
+      },
+    });
+
+    if (!clinic) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    if (!clinic.isActive) {
+      throw new BadRequestException('Clinic is inactive');
+    }
+
+    if (clinic.organization && !clinic.organization.isActive) {
+      throw new BadRequestException('Organization is inactive');
+    }
+  }
 
   // ===========================================================================
   // CREATE
@@ -30,6 +59,7 @@ export class LabTestsService {
     clinicId: string,
     dto: CreateLabTestDto,
   ): Promise<LabTestResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const existing = await this.prisma.labTest.findFirst({
       where: {
         clinicId,
@@ -184,6 +214,7 @@ export class LabTestsService {
     id: string,
     dto: UpdateLabTestDto,
   ): Promise<LabTestResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const labTest = await this.prisma.labTest.findFirst({
       where: {
         id,
@@ -297,6 +328,7 @@ export class LabTestsService {
     id: string,
     dto: UpdateLabTestStatusDto,
   ): Promise<LabTestResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const labTest = await this.prisma.labTest.findFirst({
       where: {
         id,

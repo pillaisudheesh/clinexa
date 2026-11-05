@@ -114,6 +114,11 @@ const navigation: NavigationItem[] = [
 
 const secondaryNavigation: NavigationItem[] = [
   {
+    label: "Organizations",
+    path: "/organizations",
+    icon: Building2,
+  },
+  {
     label: "Clinics",
     path: "/clinics",
     icon: Building2,
@@ -174,7 +179,7 @@ function getPageTitle(pathname: string): string {
     (entry) => pathname === entry.path || pathname.startsWith(`${entry.path}/`),
   );
 
-  return item?.label ?? "SamaRoot";
+  return item?.label ?? "SamaRoot Health";
 }
 
 export function AppShell() {
@@ -256,7 +261,7 @@ export function AppShell() {
 
   const userName = user
     ? `${user.firstName}${user.lastName ? ` ${user.lastName}` : ""}`
-    : "SamaRoot User";
+    : "SamaRoot Health User";
 
   const userInitials = user
     ? `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase()
@@ -265,7 +270,10 @@ export function AppShell() {
   // Platform-wide navigation must be based on the explicit server-provided flag,
   // never on a clinic role name such as SUPER_ADMIN.
   const canSeeNavigationItem = (item: NavigationItem) => {
-    if (item.path === "/clinics") return user?.isPlatformAdmin === true;
+    if (item.path === "/organizations" || item.path === "/clinics") {
+      return user?.isPlatformAdmin === true;
+    }
+
     return (
       !item.permission ||
       user?.isPlatformAdmin === true ||

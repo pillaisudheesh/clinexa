@@ -2,6 +2,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -17,6 +18,33 @@ export class MedicalRecordsService {
     private readonly auditService: AuditService,
   ) {}
 
+  private async assertClinicAndOrganizationActive(
+    clinicId: string,
+  ): Promise<void> {
+    const clinic = await this.prisma.clinic.findUnique({
+      where: { id: clinicId },
+      select: {
+        id: true,
+        isActive: true,
+        organization: {
+          select: { isActive: true },
+        },
+      },
+    });
+
+    if (!clinic) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    if (!clinic.isActive) {
+      throw new BadRequestException('Clinic is inactive');
+    }
+
+    if (clinic.organization && !clinic.organization.isActive) {
+      throw new BadRequestException('Organization is inactive');
+    }
+  }
+
   // The current schema scopes MedicalRecord through its Patient, Doctor and Appointment relations.
   private scopedWhere(
     clinicId: string,
@@ -31,6 +59,7 @@ export class MedicalRecordsService {
   }
 
   async create(clinicId: string, dto: CreateMedicalRecordDto, userId: string) {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const [patient, doctor, appointment] = await Promise.all([
       this.prisma.patient.findFirst({
         where: { id: dto.patientId, clinicId, isActive: true },
@@ -187,6 +216,7 @@ export class MedicalRecordsService {
     dto: UpdateMedicalRecordDto,
     userId: string,
   ) {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const existing = await this.prisma.medicalRecord.findFirst({
       where: this.scopedWhere(clinicId, id),
     });

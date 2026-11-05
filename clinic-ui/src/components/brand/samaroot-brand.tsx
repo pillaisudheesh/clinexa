@@ -22,7 +22,7 @@ export function SamaRootBrand({
   return (
     <img
       src={src}
-      alt="SamaRoot"
+      alt="SamaRoot Health"
       draggable={false}
       className={cn(
         "block object-contain",

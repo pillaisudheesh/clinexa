@@ -10,11 +10,16 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/auth/auth-context";
 import { apiClient } from "@/services/api-client";
+import {
+  organizationService,
+  type Organization,
+} from "@/services/organization-service";
 
 type Clinic = {
   id: string;
   code: string;
   name: string;
+  organizationName: string | null;
   email: string | null;
   phone: string | null;
   website: string | null;
@@ -111,6 +116,27 @@ export function ClinicsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [organizationFilter, setOrganizationFilter] = useState("");
+  const [organizationsLoading, setOrganizationsLoading] = useState(false);
+
+  useEffect(() => {
+    const loadOrganizations = async () => {
+      setOrganizationsLoading(true);
+
+      try {
+        const response = await organizationService.getAll();
+        setOrganizations(response.data);
+      } catch (e) {
+        setError(getError(e));
+      } finally {
+        setOrganizationsLoading(false);
+      }
+    };
+
+    void loadOrganizations();
+  }, []);
+
   const load = useCallback(async () => {
     if (!canRead) return;
     setLoading(true);
@@ -121,6 +147,11 @@ export function ClinicsPage() {
           page,
           limit: 10,
           search: search.trim() || undefined,
+          organizationId:
+            organizationFilter && organizationFilter !== "independent"
+              ? organizationFilter
+              : undefined,
+          independent: organizationFilter === "independent" ? true : undefined,
           sortBy: "createdAt",
           sortOrder: "desc",
         },
@@ -132,7 +163,7 @@ export function ClinicsPage() {
     } finally {
       setLoading(false);
     }
-  }, [canRead, page, search]);
+  }, [canRead, page, search, organizationFilter]);
 
   useEffect(() => {
     void load();
@@ -255,20 +286,41 @@ export function ClinicsPage() {
               Search by name, code, city, or email.
             </p>
           </div>
-          <div className="relative w-full sm:max-w-xs">
-            <Search
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-              size={16}
-            />
-            <input
-              className={`${inputClass} pl-9`}
-              placeholder="Search clinics..."
-              value={search}
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+            <select
+              className={`${inputClass} sm:w-64`}
+              value={organizationFilter}
+              disabled={organizationsLoading}
               onChange={(e) => {
-                setSearch(e.target.value);
+                setOrganizationFilter(e.target.value);
                 setPage(1);
               }}
-            />
+            >
+              <option value="">All clinics</option>
+              <option value="independent">Independent clinics</option>
+
+              {organizations.map((organization) => (
+                <option key={organization.id} value={organization.id}>
+                  {organization.name}
+                </option>
+              ))}
+            </select>
+
+            <div className="relative w-full sm:max-w-xs">
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                size={16}
+              />
+              <input
+                className={`${inputClass} pl-9`}
+                placeholder="Search clinics..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+              />
+            </div>
           </div>
         </div>
         {error && (
@@ -283,6 +335,7 @@ export function ClinicsPage() {
                 {[
                   "Clinic",
                   "Code",
+                  "Organization",
                   "Location",
                   "Contact",
                   "Status",
@@ -318,6 +371,9 @@ export function ClinicsPage() {
                     className="border-0 px-4 py-3 font-mono text-xs text-slate-600"
                   >
                     {c.code}
+                  </td>
+                  <td className="border-0 px-4 py-3 text-slate-600">
+                    {c.organizationName || "Independent"}
                   </td>
                   <td
                     style={{ borderBottom: "1px solid #f1f5f9" }}
@@ -389,6 +445,10 @@ export function ClinicsPage() {
                 <div className="min-w-0 flex-1">
                   <div className="font-semibold text-slate-900">{c.name}</div>
                   <div className="text-xs text-slate-500">{c.code}</div>
+                  <div className="mt-1 text-sm text-slate-600">
+                    <span className="text-slate-400">Organization:</span>{" "}
+                    {c.organizationName || "Independent"}
+                  </div>
                   <div className="mt-2 text-sm text-slate-600">
                     {[c.city, c.state, c.country].filter(Boolean).join(", ") ||
                       "Location not set"}
@@ -456,6 +516,7 @@ export function ClinicsPage() {
           </div>
         </div>
       </div>
+
       {modalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 p-0 sm:items-center sm:p-4"

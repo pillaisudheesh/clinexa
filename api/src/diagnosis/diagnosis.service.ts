@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -11,12 +15,41 @@ import { DiagnosisResponseDto } from './dto/diagnosis-response.dto';
 @Injectable()
 export class DiagnosisService {
   constructor(private readonly prisma: PrismaService) {}
+  private async assertClinicAndOrganizationActive(
+    clinicId: string,
+  ): Promise<void> {
+    const clinic = await this.prisma.clinic.findUnique({
+      where: { id: clinicId },
+      select: {
+        id: true,
+        isActive: true,
+        organization: {
+          select: {
+            isActive: true,
+          },
+        },
+      },
+    });
+
+    if (!clinic) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    if (!clinic.isActive) {
+      throw new BadRequestException('Clinic is inactive');
+    }
+
+    if (clinic.organization && !clinic.organization.isActive) {
+      throw new BadRequestException('Organization is inactive');
+    }
+  }
 
   // ===========================================================================
   // CREATE
   // ===========================================================================
 
   async create(clinicId: string, dto: CreateDiagnosisDto) {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const medicalRecord = await this.prisma.medicalRecord.findFirst({
       where: {
         id: dto.medicalRecordId,
@@ -163,6 +196,7 @@ export class DiagnosisService {
   // ===========================================================================
 
   async update(clinicId: string, id: string, dto: UpdateDiagnosisDto) {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const existing = await this.prisma.diagnosis.findFirst({
       where: {
         id,
@@ -238,6 +272,7 @@ export class DiagnosisService {
   // ===========================================================================
 
   async remove(clinicId: string, id: string) {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const existing = await this.prisma.diagnosis.findFirst({
       where: {
         id,

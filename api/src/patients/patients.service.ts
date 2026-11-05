@@ -29,6 +29,35 @@ export class PatientsService {
     private readonly auditService: AuditService,
   ) {}
 
+  private async assertClinicAndOrganizationActive(
+    clinicId: string,
+  ): Promise<void> {
+    const clinic = await this.prisma.clinic.findUnique({
+      where: { id: clinicId },
+      select: {
+        id: true,
+        isActive: true,
+        organization: {
+          select: {
+            isActive: true,
+          },
+        },
+      },
+    });
+
+    if (!clinic) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    if (!clinic.isActive) {
+      throw new BadRequestException('Clinic is inactive');
+    }
+
+    if (clinic.organization && !clinic.organization.isActive) {
+      throw new BadRequestException('Organization is inactive');
+    }
+  }
+
   private async getPatientOrThrow(clinicId: string, patientId: string) {
     const patient = await this.prisma.patient.findFirst({
       where: { id: patientId, clinicId },
@@ -103,6 +132,7 @@ export class PatientsService {
     dto: CreatePatientDto,
     userId: string,
   ): Promise<PatientResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     if (new Date(dto.dateOfBirth) > new Date()) {
       throw new BadRequestException('Date of birth cannot be in the future.');
     }
@@ -165,6 +195,7 @@ export class PatientsService {
     dto: UpdatePatientDto,
     userId: string,
   ): Promise<PatientResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const existingPatient = await this.getPatientOrThrow(clinicId, id);
 
     if (dto.dateOfBirth && new Date(dto.dateOfBirth) > new Date()) {
@@ -222,6 +253,7 @@ export class PatientsService {
     dto: UpdatePatientStatusDto,
     userId: string,
   ): Promise<PatientResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const existingPatient = await this.getPatientOrThrow(clinicId, id);
 
     const patient = await this.prisma.$transaction(async (tx) => {
@@ -238,7 +270,9 @@ export class PatientsService {
           action: dto.isActive ? 'ACTIVATE' : 'DEACTIVATE',
           entityType: 'Patient',
           entityId: updatedPatient.id,
-          description: dto.isActive ? 'Patient activated' : 'Patient deactivated',
+          description: dto.isActive
+            ? 'Patient activated'
+            : 'Patient deactivated',
           metadata: {
             previousIsActive: existingPatient.isActive,
             isActive: updatedPatient.isActive,

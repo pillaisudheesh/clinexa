@@ -27,6 +27,34 @@ type InvoiceWithItems = Prisma.InvoiceGetPayload<{
 @Injectable()
 export class InvoicesService {
   constructor(private readonly prisma: PrismaService) {}
+  private async assertClinicAndOrganizationActive(
+    clinicId: string,
+  ): Promise<void> {
+    const clinic = await this.prisma.clinic.findUnique({
+      where: { id: clinicId },
+      select: {
+        id: true,
+        isActive: true,
+        organization: {
+          select: {
+            isActive: true,
+          },
+        },
+      },
+    });
+
+    if (!clinic) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    if (!clinic.isActive) {
+      throw new BadRequestException('Clinic is inactive');
+    }
+
+    if (clinic.organization && !clinic.organization.isActive) {
+      throw new BadRequestException('Organization is inactive');
+    }
+  }
 
   // ===========================================================================
   // CREATE
@@ -36,6 +64,7 @@ export class InvoicesService {
     clinicId: string,
     dto: CreateInvoiceDto,
   ): Promise<InvoiceResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     if (!dto.items || dto.items.length === 0) {
       throw new BadRequestException('At least one invoice item is required');
     }
@@ -280,6 +309,7 @@ export class InvoicesService {
     id: string,
     dto: UpdateInvoiceDto,
   ): Promise<InvoiceResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const invoice = await this.getInvoiceForUpdate(clinicId, id);
 
     if (invoice.status !== InvoiceStatus.DRAFT) {
@@ -380,6 +410,7 @@ export class InvoicesService {
     invoiceId: string,
     dto: CreateInvoiceItemDto,
   ): Promise<InvoiceResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     this.validateManualItem(dto);
 
     const invoice = await this.getInvoiceForUpdate(clinicId, invoiceId);
@@ -438,6 +469,7 @@ export class InvoicesService {
     invoiceId: string,
     itemId: string,
   ): Promise<InvoiceResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const invoice = await this.getInvoiceForUpdate(clinicId, invoiceId);
 
     if (invoice.status !== InvoiceStatus.DRAFT) {
@@ -503,6 +535,7 @@ export class InvoicesService {
     invoiceId: string,
     labOrderId: string,
   ): Promise<InvoiceResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const invoice = await this.getInvoiceForUpdate(clinicId, invoiceId);
 
     if (invoice.status !== InvoiceStatus.DRAFT) {
@@ -579,6 +612,7 @@ export class InvoicesService {
     invoiceId: string,
     dispensingId: string,
   ): Promise<InvoiceResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const invoice = await this.getInvoiceForUpdate(clinicId, invoiceId);
 
     if (invoice.status !== InvoiceStatus.DRAFT) {
@@ -645,6 +679,7 @@ export class InvoicesService {
   // ===========================================================================
 
   async issue(clinicId: string, id: string): Promise<InvoiceResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const invoice = await this.getInvoiceForUpdate(clinicId, id);
 
     if (invoice.status !== InvoiceStatus.DRAFT) {
@@ -688,6 +723,7 @@ export class InvoicesService {
   // ===========================================================================
 
   async cancel(clinicId: string, id: string): Promise<InvoiceResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const invoice = await this.getInvoiceForUpdate(clinicId, id);
 
     if (

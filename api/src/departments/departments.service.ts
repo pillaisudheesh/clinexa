@@ -2,6 +2,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { Department, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -18,6 +19,34 @@ import { UpdateDepartmentStatusDto } from './dto/update-department-status.dto';
 @Injectable()
 export class DepartmentsService {
   constructor(private readonly prisma: PrismaService) {}
+  private async assertClinicAndOrganizationActive(
+    clinicId: string,
+  ): Promise<void> {
+    const clinic = await this.prisma.clinic.findUnique({
+      where: { id: clinicId },
+      select: {
+        id: true,
+        isActive: true,
+        organization: {
+          select: {
+            isActive: true,
+          },
+        },
+      },
+    });
+
+    if (!clinic) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    if (!clinic.isActive) {
+      throw new BadRequestException('Clinic is inactive');
+    }
+
+    if (clinic.organization && !clinic.organization.isActive) {
+      throw new BadRequestException('Organization is inactive');
+    }
+  }
 
   async findAll(
     clinicId: string,
@@ -86,6 +115,7 @@ export class DepartmentsService {
     clinicId: string,
     dto: CreateDepartmentDto,
   ): Promise<DepartmentResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     const code = dto.code.trim().toUpperCase();
 
     const name = dto.name.trim();
@@ -131,6 +161,7 @@ export class DepartmentsService {
     id: string,
     dto: UpdateDepartmentDto,
   ): Promise<DepartmentResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     await this.getDepartmentOrThrow(clinicId, id);
 
     if (dto.code || dto.name) {
@@ -196,6 +227,7 @@ export class DepartmentsService {
     id: string,
     dto: UpdateDepartmentStatusDto,
   ): Promise<DepartmentResponseDto> {
+    await this.assertClinicAndOrganizationActive(clinicId);
     await this.getDepartmentOrThrow(clinicId, id);
 
     const department = await this.prisma.department.update({

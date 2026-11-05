@@ -31,7 +31,7 @@ export function MobileNavigation({
               <HeartPulse className="size-5" />
             </div>
 
-            <span>SamaRoot</span>
+            <span>SamaRoot Health</span>
           </SheetTitle>
         </SheetHeader>
 

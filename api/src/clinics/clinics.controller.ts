@@ -52,7 +52,8 @@ export class ClinicsController {
   @Permissions(PermissionCodes.CLINIC_CREATE)
   @ApiOperation({
     summary: 'Create a clinic',
-    description: 'Creates a new clinic. Platform Administrator access is required.',
+    description:
+      'Creates a new clinic. Platform Administrator access is required.',
   })
   @ApiResponse({
     status: 201,
@@ -90,7 +91,8 @@ export class ClinicsController {
   @Permissions(PermissionCodes.CLINIC_READ)
   @ApiOperation({
     summary: 'Get all clinics',
-    description: 'Returns a paginated list of clinics. Platform Administrator access is required to view clinics across the platform.',
+    description:
+      'Returns a paginated list of clinics. Platform Administrator access is required to view clinics across the platform.',
   })
   @ApiOkResponse({
     description: 'Clinics retrieved successfully.',
@@ -118,7 +120,8 @@ export class ClinicsController {
   @Permissions(PermissionCodes.CLINIC_READ)
   @ApiOperation({
     summary: 'Get clinic by ID',
-    description: 'Returns a single clinic by its ID. Platform Administrator access is required for cross-clinic access.',
+    description:
+      'Returns a single clinic by its ID. Platform Administrator access is required for cross-clinic access.',
   })
   @ApiResponse({
     status: 200,
@@ -151,7 +154,8 @@ export class ClinicsController {
   @Permissions(PermissionCodes.CLINIC_UPDATE)
   @ApiOperation({
     summary: 'Update clinic',
-    description: 'Updates clinic information. Platform Administrator access is required.',
+    description:
+      'Updates clinic information. Platform Administrator access is required.',
   })
   @ApiResponse({
     status: 200,

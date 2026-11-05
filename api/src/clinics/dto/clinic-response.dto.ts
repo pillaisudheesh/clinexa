@@ -1,33 +1,34 @@
 export class ClinicResponseDto {
-  id: string;
+  id!: string;
 
-  code: string;
+  code!: string;
 
-  name: string;
+  name!: string;
 
-  email: string | null;
+  email!: string | null;
 
-  phone: string | null;
+  phone!: string | null;
 
-  website: string | null;
+  website!: string | null;
 
-  addressLine1: string | null;
+  addressLine1!: string | null;
 
-  addressLine2: string | null;
+  addressLine2!: string | null;
 
-  city: string | null;
+  city!: string | null;
 
-  state: string | null;
+  state!: string | null;
 
-  country: string | null;
+  country!: string | null;
 
-  postalCode: string | null;
+  postalCode!: string | null;
 
-  timezone: string;
+  timezone!: string;
 
-  isActive: boolean;
+  isActive!: boolean;
 
-  createdAt: Date;
+  createdAt!: Date;
 
-  updatedAt: Date;
+  updatedAt!: Date;
+  organizationName!: string | null;
 }
